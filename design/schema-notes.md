@@ -1,7 +1,7 @@
 # Schema Design Notes — Baseball Analytics Database
-- **Source:** FanGraphs season aggregates via `pybaseball`, 2015–2025
+- **Source:** FanGraphs JSON leaderboard API, 2015–2025
 - **Relations:** 7 · **Normal form:** BCNF, with three documented exceptions
-- **Status:** schema executes clean; all FK, CHECK and UNIQUE constraints verified against sample inserts
+- **Status:** loaded and validated -  4,019 players, 15,521 batting and 8,968 pitching season rows, 330 team-seasons; every AVG/OBP/SLG/IP/ERA reconciles against source and `foreign_key_check` is clean
 
 ---
 
@@ -9,23 +9,24 @@
 
 The single most important decision, because it determines what every downstream query means.
 
-| Relation | Grain | Rows (est.) |
+| Relation | Grain | Rows |
 |---|---|---|
 | `divisions` | one row per division | 6 |
 | `teams` | one row per franchise | 30 |
 | `seasons` | one row per season | 11 |
-| `players` | one row per player | ~3,000 |
-| `batting_stats` | **one row per player per season** | ~14,000 |
-| `pitching_stats` | **one row per player per season** | ~9,000 |
+| `players` | one row per player | 4,019 |
+| `batting_stats` | **one row per player per season** | 15,521 |
+| `pitching_stats` | **one row per player per season** | 8,968 |
 | `team_stats` | one row per team per season | 330 |
 
-`pybaseball.batting_stats(year)` returns one row per player per season, already
+The FanGraphs leaderboard API returns one row per player per season, already
 aggregated across teams. The schema matches that grain rather than inventing a
 stint-level grain the source cannot fill. `UNIQUE (player_id, season_year)` makes
 this contract enforceable rather than aspirational.
 
 **Consequence:** a player traded mid-season has one row with `team_id IS NULL`
-and `is_multi_team = 1`. Any "stats by team" query must filter
+and `is_multi_team = 1` — the source labels these `2 Tms` through `5 Tms`, and
+they run 120–140 batters a season. Any "stats by team" query must filter
 `is_multi_team = 0` or it will silently undercount. This is called out here
 because it is the mistake most likely to produce plausible-but-wrong query
 results in Phase 3.
@@ -147,6 +148,46 @@ Ohtani appears in both `batting_stats` and `pitching_stats`, each FK'd to the
 same `players` row. This falls out of separating the fact tables by role rather
 than by player — worth naming explicitly, because interviewers ask.
 
+### 3.7 Oakland's abbreviation changed mid-window
+
+The Athletics are `OAK` in the 2015–2024 data and `ATH` in 2025.
+`teams.fangraphs_abbrev` holds one value per franchise, so the loader aliases
+`ATH` to `OAK` rather than adding a second teams row. This is the concrete
+payoff of §3.4: because `team_id` is a franchise code and not the display
+abbreviation, a mid-window rename costs one line in the loader instead of a
+schema change and a re-key.
+
+### 3.8 `v_batting_season` excludes players who never batted
+
+About 6,400 of the 15,521 batting rows have zero plate appearances — pitchers
+who appear on the batting leaderboard without ever hitting. They are not
+errors, so they stay in `batting_stats`, but they would distort every average,
+rank and percentile in Phase 3, where 40% of the population would be empty
+rows. `v_batting_season` filters `plate_appearances > 0`, leaving 9,173 real
+batter-seasons. The table keeps the complete record; the view is the correct
+default.
+
+### 3.9 Switch-pitchers
+
+`players.throws` accepts `'L'`, `'R'` and `'B'`, matching `bats`. Two players
+in this window throw with both hands — Pat Venditte and Anthony Seigler — and
+`'B'` is accurate data, not a load error. `throws` is NULL for the 1,417
+position players who never pitched, since only the pitching feed carries it.
+
+### 3.10 Primary position is single-valued; ambiguous players are NULL
+
+FanGraphs reports every position a player appeared at, in scorebook order
+rather than primary-first: `DH/OF`, `2B/3B/SS`, `C/1B`. `primary_position`
+accepts one value, so the loader resolves them: DH, PH and PR are dropped when
+a fielding position is also listed; an all-infield mix becomes `IF`; anything
+still mixed (`2B/OF`) is NULL. The most recent season wins, and the batting
+label beats the pitching one.
+
+This leaves 1,362 players with an unambiguous position, 223 as `IF`, and 153
+NULL. Position-based queries filter to the unambiguous set and say so —
+a primary position is not well-defined for a genuine utility player, and
+inventing one would be worse than excluding them.
+
 ---
 
 ## 4. Deliberate exceptions to strict normalization
@@ -162,8 +203,10 @@ documented one is a decision.
 
 2. **Imported metrics are snapshots.** FanGraphs recalculates WAR historically
    as its models change, so `war` is really "FanGraphs WAR as of the load date."
-   The schema does not version this. If Phase 2 reloads, add a `loaded_at` column
-   or a small `data_loads` table before comparing numbers across loads.
+   The schema does not version this, but `database/raw/` is committed, so the
+   snapshot those numbers came from is pinned in git even though the column
+   isn't. A `loaded_at` column or a `data_loads` table would be the schema-level
+   fix if loads ever need comparing directly.
 
 3. **`payroll_usd` lives at the wrong native grain.** Payroll is
    contract-level data from a different source system, flattened to team-season.
@@ -172,34 +215,41 @@ documented one is a decision.
 
 ---
 
-## 5. Source realities to handle in Phase 2
+## 5. Source realities (resolved in Phase 2)
 
-Each of these will cause a wrong or empty load if missed:
+Each of these would have caused a wrong or empty load. How the loader handles them:
 
 | Issue | Handling |
 |---|---|
-| **`qual` parameter** — `batting_stats()` may default to *qualified* batters only, which would silently drop most of the league | Pass `qual=0` explicitly and assert row counts (~1,300–1,500 batters/yr, not ~140) |
-| **`ind` parameter** — controls per-season vs. career aggregation | Pass `ind=1` for one row per player-season |
-| **Multi-team players** show `Team == "- - -"` | Map to `team_id = NULL, is_multi_team = 1` |
-| **No `birth_date` or position** in FanGraphs stat pulls | Requires `pybaseball.chadwick_register()`; join on `key_fangraphs` → `player_id` |
-| **No payroll** anywhere in pybaseball | Manual CSV from Spotrac / Cot's Contracts — 330 rows |
-| **IP arrives as `180.1`** | Convert to `outs_recorded` at load (§3.1) |
-| **FanGraphs column names** are display labels (`HR`, `wRC+`, `K/9`) | Explicit rename map in the loader; do not `to_sql()` a raw DataFrame |
-| **`to_sql(if_exists='replace')`** drops the table and its constraints | Never use it — it destroys the schema this document describes. Use `INSERT ... ON CONFLICT` |
-| **Team stats** (W/L, RS/RA) come from `team_batting`/`team_pitching` or standings, not the player pulls | Separate loader step |
+| **`pybaseball` is dead for FanGraphs.** It scrapes `leaders-legacy.aspx`, which FanGraphs retired and now answers with 403 | Call the JSON API backing the current site directly: `/api/leaders/major-league/data` |
+| **Browser User-Agents get challenged.** A spoofed `Mozilla/5.0` hits a Cloudflare check | Send a descriptive UA naming the script. Identifying honestly is what works — and is the right thing regardless |
+| **`qual` defaults to qualified batters only**, which would silently drop ~90% of the league | Pass `qual=0` and assert against the response's own `totalCount` |
+| **Pagination truncates silently** if `pageitems` is too small | Assert `len(data) == totalCount`; a short read raises |
+| **Multi-team players** appear as `2 Tms` … `5 Tms` | Map to `team_id = NULL, is_multi_team = 1` |
+| **`playerTeamId` is the player's *current* club**, not the season's | Use `TeamNameAbb`. Ohtani's 2023 row is the test case: `teamid` 1 (LAA, correct) vs `playerTeamId` 22 (LAD) |
+| **`Name` and `Team` are HTML anchors** | Use `PlayerName` and `TeamNameAbb` |
+| **No `birth_date`** in the stat feed | Read the Chadwick register archive directly. `pybaseball.chadwick_register()` is not usable here — it keeps only names and ID keys and discards `birth_year`/`birth_month`/`birth_day` |
+| **No payroll** in any FanGraphs feed | Manual CSV from Spotrac / Cot's Contracts — 330 rows |
+| **IP arrives as `186.2`** (186⅔, not 186.2) | Convert to `outs_recorded` at load (§3.1) |
+| **Zero-AB rows** report AVG/OBP/SLG as `0.0`; generated columns return NULL | Validation accepts NULL only where the source reports 0; NULL against any nonzero value still fails |
+| **Oakland is `ATH` in 2025**, `OAK` before | Loader aliases it (§3.7) |
+| **PowerShell adds a BOM** to any file it writes | Read every cached CSV with `encoding='utf-8-sig'` |
+| **Raw payload is ~400 columns, ~12 MB/season** | Trim to mapped columns plus AVG/OBP/SLG/IP/ERA before caching — 6.5 MB for all 22 files |
+| **Team stats** (W/L, RS/RA) aren't in the player feed | Not yet loaded; `team_stats` currently holds payroll only |
 
 ### FanGraphs → schema column map (batting, abbreviated)
 
-| pybaseball | schema | pybaseball | schema |
+| JSON key | schema | JSON key | schema |
 |---|---|---|---|
-| `IDfg` | `player_id` | `BB` | `walks` |
-| `Name` | `full_name` | `IBB` | `intentional_walks` |
-| `Team` | `team_id` (`"- - -"` → NULL) | `HBP` | `hit_by_pitch` |
+| `playerid` | `player_id` | `BB` | `walks` |
+| `PlayerName` | `full_name` | `IBB` | `intentional_walks` |
+| `TeamNameAbb` | `team_id` (`N Tms` → NULL) | `HBP` | `hit_by_pitch` |
 | `Season` | `season_year` | `SO` | `strikeouts` |
 | `G` | `games` | `SF` / `SH` | `sac_flies` / `sac_hits` |
 | `PA` / `AB` | `plate_appearances` / `at_bats` | `SB` / `CS` | `stolen_bases` / `caught_stealing` |
 | `H` / `2B` / `3B` / `HR` | `hits` / `doubles` / `triples` / `home_runs` | `wOBA` / `wRC+` / `WAR` | `woba` / `wrc_plus` / `war` |
-| `R` / `RBI` | `runs` / `rbi` | `Off` / `Def` / `BsR` | `off_runs` / `def_runs` / `bsr` |
+| `R` / `RBI` | `runs` / `rbi` | `Offense` / `Defense` / `BaseRunning` | `off_runs` / `def_runs` / `bsr` |
+| `Bats` / `Throws` / `position` | `players.bats` / `throws` / `primary_position` | | |
 
 `AVG`, `OBP`, `SLG`, `OPS`, `ISO`, `BB%`, `K%` are **not loaded** — they are
 generated. Use them as a validation check instead: recompute from the loaded
@@ -224,22 +274,24 @@ Carried forward so they don't resurface later:
 
 ---
 
-## 7. Open decisions
+## 7. Resolved decisions
 
-Four things Phase 2 needs an answer on:
+All four questions Phase 1 left open were settled during the Phase 2 load:
 
-1. **Payroll** — load it (330 manual rows, unlocks the payroll-efficiency and
-   undervalued-player queries) or drop the column and cut those two queries?
-2. **Birth dates** — pull the Chadwick register (~20k rows, one extra download)
-   or drop the birth-cohort query?
-3. **Position** — FanGraphs stat pulls don't carry a clean primary position.
-   Derive from fielding innings, take it from Chadwick, or simplify to
-   batter/pitcher?
-4. **2025** — is the season complete in the data as of this load, and is a
-   partial season worth flagging in `seasons.note`?
+1. **Payroll — loaded.** 330 team-seasons of Opening Day payroll, hand-built
+   from Spotrac. Keeps the payroll-efficiency and undervalued-player queries
+   alive.
+2. **Birth dates — loaded.** From the raw Chadwick register, matching all 4,019
+   players. `mlbam_id` and `bbref_id` came along with them, so Statcast and
+   Baseball-Reference joins are available later without a re-key.
+3. **Position — from the API.** The leaderboard feed carries `position`, `Bats`
+   and `Throws` directly, which the old stat pulls did not. Resolution rules and
+   their limits are in §3.10.
+4. **2025 — complete.** No partial-season flag needed in `seasons.note`.
 
-Items 1 and 2 each gate two of the Phase 3 queries, so they're worth deciding
-before the loader is written rather than after.
+Still open, and the reason the Pythagorean and run-differential queries can't be
+written yet: `team_stats` holds payroll only. Wins, losses, runs scored and runs
+allowed need a separate loader step from a standings feed.
 
 ---
 
@@ -249,7 +301,12 @@ before the loader is written rather than after.
 |---|---|
 | `design/schema.sql` | `CREATE TABLE` / `CREATE VIEW` statements, constraints, indexes |
 | `design/er-diagram.svg` | E-R diagram, crow's-foot notation |
-| `design/make_er_diagram.py` | Regenerates the diagram — re-run after any schema change |
 | `design/schema-notes.md` | This document |
+| `scripts/load_data.py` | Seven-step loader: schema → reference → batting → pitching → identity → payroll → validation |
+| `database/seed_reference.sql` | Divisions, teams and seasons (36 rows, hand-maintained) |
+| `database/payroll.csv` | Opening Day payroll, 30 teams × 11 seasons |
+| `database/raw/` | Trimmed API snapshots, committed so the DB rebuilds without a live pull |
+| `database/baseball.db` | Generated — gitignored, rebuilt by the loader in seconds from `raw/` |
 
-**Verification:** `python3 -c "import sqlite3; sqlite3.connect(':memory:').executescript(open('design/schema.sql').read())"`
+**Verification:** `python scripts/load_data.py` — rebuilds from `database/raw/`
+and exits non-zero on any validation failure.
