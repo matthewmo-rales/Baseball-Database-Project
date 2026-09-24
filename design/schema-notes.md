@@ -235,7 +235,7 @@ Each of these would have caused a wrong or empty load. How the loader handles th
 | **Oakland is `ATH` in 2025**, `OAK` before | Loader aliases it (§3.7) |
 | **PowerShell adds a BOM** to any file it writes | Read every cached CSV with `encoding='utf-8-sig'` |
 | **Raw payload is ~400 columns, ~12 MB/season** | Trim to mapped columns plus AVG/OBP/SLG/IP/ERA before caching — 6.5 MB for all 22 files |
-| **Team stats** (W/L, RS/RA) aren't in the player feed | Not yet loaded; `team_stats` currently holds payroll only |
+| **Team stats** (W/L, RS/RA) aren't in the player feed | Separate pull with `team=0,ts`. W/L and runs allowed come from the pitching feed, runs scored from batting. `G` in both feeds sums player appearances — use pitching `GS` for team games |
 
 ### FanGraphs → schema column map (batting, abbreviated)
 
@@ -289,10 +289,11 @@ All four questions Phase 1 left open were settled during the Phase 2 load:
    their limits are in §3.10.
 4. **2025 — complete.** No partial-season flag needed in `seasons.note`.
 
-Still open, and the reason the Pythagorean and run-differential queries can't be
-written yet: `team_stats` holds payroll only. Wins, losses, runs scored and runs
-allowed need a separate loader step from a standings feed.
-
+Since resolved: `team_stats` now carries games, wins, losses, runs scored and
+runs allowed for all 330 team-seasons, validated by two identities that must
+hold exactly — league-wide wins equal losses, and runs scored equal runs
+allowed, in every season. `playoff_result` remains NULL; it would need 330
+hand-entered values and no planned query uses it.
 ---
 
 ## 8. Files
