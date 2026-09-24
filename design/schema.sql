@@ -108,7 +108,7 @@ CREATE INDEX idx_players_name ON players(last_name, first_name);
 -- ---------------------------------------------------------------------------
 -- Grain: one row per player per season (FanGraphs season aggregate).
 -- team_id IS NULL when the player appeared for 2+ clubs that year; FanGraphs
--- reports those as "- - -". is_multi_team makes that explicit rather than
+-- reports those as "2 Tms" .. "5 Tms". is_multi_team makes that explicit than
 -- forcing every query to reason about a NULL.
 --
 -- Rate stats that are a pure function of the counting stats in this row are
