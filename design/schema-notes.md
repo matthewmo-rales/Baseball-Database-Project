@@ -1,0 +1,255 @@
+# Schema Design Notes — Baseball Analytics Database
+- **Source:** FanGraphs season aggregates via `pybaseball`, 2015–2025
+- **Relations:** 7 · **Normal form:** BCNF, with three documented exceptions
+- **Status:** schema executes clean; all FK, CHECK and UNIQUE constraints verified against sample inserts
+
+---
+
+## 1. Grain
+
+The single most important decision, because it determines what every downstream query means.
+
+| Relation | Grain | Rows (est.) |
+|---|---|---|
+| `divisions` | one row per division | 6 |
+| `teams` | one row per franchise | 30 |
+| `seasons` | one row per season | 11 |
+| `players` | one row per player | ~3,000 |
+| `batting_stats` | **one row per player per season** | ~14,000 |
+| `pitching_stats` | **one row per player per season** | ~9,000 |
+| `team_stats` | one row per team per season | 330 |
+
+`pybaseball.batting_stats(year)` returns one row per player per season, already
+aggregated across teams. The schema matches that grain rather than inventing a
+stint-level grain the source cannot fill. `UNIQUE (player_id, season_year)` makes
+this contract enforceable rather than aspirational.
+
+**Consequence:** a player traded mid-season has one row with `team_id IS NULL`
+and `is_multi_team = 1`. Any "stats by team" query must filter
+`is_multi_team = 0` or it will silently undercount. This is called out here
+because it is the mistake most likely to produce plausible-but-wrong query
+results in Phase 3.
+
+---
+
+## 2. Normalization analysis
+
+### Functional dependencies, by relation
+
+**`divisions`** — `division_id → division_name, league`; also
+`{league, division_name} → division_id`. Two candidate keys, both determinants
+are superkeys. **BCNF.**
+
+**`teams`** — `team_id →` everything else. Single candidate key. **BCNF.**
+
+> This relation is the reason `divisions` exists. The obvious design puts
+> `league` and `division` directly on `teams`, which creates the transitive
+> dependency `team_id → division → league` — a textbook **3NF violation**.
+> The anomaly is real, not theoretical: correcting a division's league
+> assignment would require touching every team row in that division, and
+> nothing structurally prevents 'NL East' and 'AL' appearing on the same row.
+> Extracting `divisions` removes it.
+
+**`seasons`** — `season_year →` everything else. **BCNF.**
+
+**`players`** — `player_id →` everything else; `mlbam_id →` and `bbref_id →`
+likewise (three candidate keys, all declared). **BCNF.**
+
+**`batting_stats` / `pitching_stats`** — candidate keys `{batting_id}` and
+`{player_id, season_year}`. Every attribute is fully dependent on the composite
+key; none depends on another non-key attribute. **BCNF.**
+
+> This is only true because of the generated-column decision in §3.2. Storing
+> `batting_avg` as a plain column would introduce
+> `{hits, at_bats} → batting_avg` — a dependency between non-key attributes,
+> i.e. a 3NF violation, and the source of a genuine update anomaly (correct a
+> hit total, and the stored average is now a lie).
+
+**`team_stats`** — candidate keys `{team_stat_id}` and `{team_id, season_year}`.
+**BCNF.**
+
+### Why surrogate keys alongside natural keys
+
+Each fact table has an `INTEGER PRIMARY KEY` surrogate *and* a `UNIQUE`
+constraint on its natural key. The surrogate keeps the Flask app's URLs and FK
+references short and stable; the `UNIQUE` constraint is what actually enforces
+the grain and makes the loader idempotent
+(`INSERT ... ON CONFLICT (player_id, season_year) DO UPDATE`). Dropping either
+one loses something: without the surrogate, re-keying is painful; without the
+natural-key constraint, a second load run silently doubles the data.
+
+---
+
+## 3. Key design decisions
+
+### 3.1 Innings pitched are stored as **outs**, never as `180.1`
+
+Baseball writes 180⅓ innings as `180.1`. That notation is base-3 masquerading
+as decimal. `SUM(innings_pitched)` over `180.1 + 180.2` returns `360.3` where
+the answer is 361 — and `earned_runs * 9 / 180.1` is wrong by about 0.2 runs of
+ERA. The bug is quiet: every number still looks like a plausible ERA.
+
+`pitching_stats.outs_recorded INTEGER` is the canonical unit. Two generated
+columns sit on top:
+
+- `innings_pitched` — true decimal (`outs / 3.0`), **use this for all arithmetic**
+- `ip_display` — conventional notation (`outs/3 + (outs%3)/10`), **display only, never aggregate**
+
+Loader conversion: `outs = round(ip_float) * 3 + round((ip_float % 1) * 10)`.
+
+### 3.2 Derived rates are generated columns; context-dependent metrics are stored
+
+Two categories of statistic, handled differently on principle:
+
+| | Examples | Treatment | Why |
+|---|---|---|---|
+| **Derivable in-row** | AVG, OBP, SLG, OPS, ISO, ERA, WHIP, K/9, win%, run differential | `GENERATED ALWAYS AS ... VIRTUAL` | A pure function of columns in the same row. Storing it duplicates information and can drift from its inputs. |
+| **Context-dependent** | WAR, wOBA, wRC+, FIP, xFIP, ERA-, BsR | Stored `REAL` | Depends on league-wide run environment, park factors and positional adjustments — data this database does not hold. Not derivable, therefore no redundancy and no violation. |
+
+`VIRTUAL` (not `STORED`) means zero disk cost, computed on read. At this data
+volume the cost is negligible and the correctness guarantee is absolute.
+
+This split is also the cleanest interview answer to *"why did you normalize it
+that way?"* — the line isn't "normalize everything," it's **derivable stays
+derived, imported stays stored.**
+
+### 3.3 ERA+ is derived from ERA-, not re-sourced
+
+The project brief asks for ERA+. That is the Baseball-Reference scale;
+FanGraphs — the actual source — publishes **ERA-**. They are reciprocal:
+ERA+ ≈ 10000 / ERA-. `era_minus` is stored (it is what the source gives) and
+`era_plus` is generated. Pulling ERA+ separately from Baseball-Reference would
+mean two run-environment models in one table, and columns that disagree.
+
+### 3.4 `team_id` is a stable franchise code, not the display abbreviation
+
+Cleveland became the Guardians in 2022; Oakland's identity changed in 2025. If
+`team_id` were the display abbreviation, a rename would orphan years of stats
+or require cascading rewrites. `team_id` is stable; `team_name` and
+`fangraphs_abbrev` are attributes that can change.
+
+**Known simplification:** `teams` holds *current* identity only, so a 2016 query
+labels Cleveland "Guardians." No league or division realignment occurred within
+2015–2025, so this is cosmetic. The fix, if it matters later, is a
+`team_name_history(team_id, season_year, name)` relation — noted rather than
+built, because it adds a join to every query for a label.
+
+### 3.5 `seasons` carries `scheduled_games`
+
+2020 was 60 games. Without this column, every per-162 rate, counting-stat
+leaderboard and career-arc query treats 2020 as a collapse. One small lookup
+relation makes the correction a join instead of a hardcoded `CASE WHEN
+season_year = 2020`.
+
+### 3.6 Two-way players need no special handling
+
+Ohtani appears in both `batting_stats` and `pitching_stats`, each FK'd to the
+same `players` row. This falls out of separating the fact tables by role rather
+than by player — worth naming explicitly, because interviewers ask.
+
+---
+
+## 4. Deliberate exceptions to strict normalization
+
+Listing these is the point; an undocumented exception is a mistake, a
+documented one is a decision.
+
+1. **`is_multi_team` is redundant with `team_id IS NULL`.** The CHECK constraint
+   `is_multi_team = 1 OR team_id IS NOT NULL` ties them together, so they cannot
+   drift. Kept because SQL `NULL` is overloaded — a reader cannot tell "played
+   for several clubs" from "we failed to load the team." The explicit flag also
+   keeps Phase 3 queries readable. **Cost: one redundant boolean per row.**
+
+2. **Imported metrics are snapshots.** FanGraphs recalculates WAR historically
+   as its models change, so `war` is really "FanGraphs WAR as of the load date."
+   The schema does not version this. If Phase 2 reloads, add a `loaded_at` column
+   or a small `data_loads` table before comparing numbers across loads.
+
+3. **`payroll_usd` lives at the wrong native grain.** Payroll is
+   contract-level data from a different source system, flattened to team-season.
+   It is nullable and documented as externally sourced so a NULL reads as "not
+   loaded," not "zero."
+
+---
+
+## 5. Source realities to handle in Phase 2
+
+Each of these will cause a wrong or empty load if missed:
+
+| Issue | Handling |
+|---|---|
+| **`qual` parameter** — `batting_stats()` may default to *qualified* batters only, which would silently drop most of the league | Pass `qual=0` explicitly and assert row counts (~1,300–1,500 batters/yr, not ~140) |
+| **`ind` parameter** — controls per-season vs. career aggregation | Pass `ind=1` for one row per player-season |
+| **Multi-team players** show `Team == "- - -"` | Map to `team_id = NULL, is_multi_team = 1` |
+| **No `birth_date` or position** in FanGraphs stat pulls | Requires `pybaseball.chadwick_register()`; join on `key_fangraphs` → `player_id` |
+| **No payroll** anywhere in pybaseball | Manual CSV from Spotrac / Cot's Contracts — 330 rows |
+| **IP arrives as `180.1`** | Convert to `outs_recorded` at load (§3.1) |
+| **FanGraphs column names** are display labels (`HR`, `wRC+`, `K/9`) | Explicit rename map in the loader; do not `to_sql()` a raw DataFrame |
+| **`to_sql(if_exists='replace')`** drops the table and its constraints | Never use it — it destroys the schema this document describes. Use `INSERT ... ON CONFLICT` |
+| **Team stats** (W/L, RS/RA) come from `team_batting`/`team_pitching` or standings, not the player pulls | Separate loader step |
+
+### FanGraphs → schema column map (batting, abbreviated)
+
+| pybaseball | schema | pybaseball | schema |
+|---|---|---|---|
+| `IDfg` | `player_id` | `BB` | `walks` |
+| `Name` | `full_name` | `IBB` | `intentional_walks` |
+| `Team` | `team_id` (`"- - -"` → NULL) | `HBP` | `hit_by_pitch` |
+| `Season` | `season_year` | `SO` | `strikeouts` |
+| `G` | `games` | `SF` / `SH` | `sac_flies` / `sac_hits` |
+| `PA` / `AB` | `plate_appearances` / `at_bats` | `SB` / `CS` | `stolen_bases` / `caught_stealing` |
+| `H` / `2B` / `3B` / `HR` | `hits` / `doubles` / `triples` / `home_runs` | `wOBA` / `wRC+` / `WAR` | `woba` / `wrc_plus` / `war` |
+| `R` / `RBI` | `runs` / `rbi` | `Off` / `Def` / `BsR` | `off_runs` / `def_runs` / `bsr` |
+
+`AVG`, `OBP`, `SLG`, `OPS`, `ISO`, `BB%`, `K%` are **not loaded** — they are
+generated. Use them as a validation check instead: recompute from the loaded
+counting stats and compare to the FanGraphs values. A mismatch means a bad load.
+
+---
+
+## 6. Corrections to the original project brief
+
+Carried forward so they don't resurface later:
+
+- **`QUALIFY`** (brief, Query 1) is Snowflake/BigQuery syntax. SQLite has no
+  `QUALIFY` — wrap the window function in a CTE and filter in the outer query.
+- **`YEAR(birth_date)`** (brief, Query 10) is not a SQLite function. Use
+  `CAST(strftime('%Y', birth_date) AS INTEGER)`.
+- **f-string SQL in the Flask route** (brief, Phase 4 `search_player`) is a SQL
+  injection hole — `name` goes straight from the query string into the
+  statement. Use parameter binding (`?`) everywhere, including `LIKE`:
+  `WHERE full_name LIKE ?` with `('%' + name + '%',)`. Worth doing right the
+  first time and worth mentioning in interviews.
+- **"6 core entities"** became 7 — `divisions` was split out to reach 3NF (§2).
+
+---
+
+## 7. Open decisions
+
+Four things Phase 2 needs an answer on:
+
+1. **Payroll** — load it (330 manual rows, unlocks the payroll-efficiency and
+   undervalued-player queries) or drop the column and cut those two queries?
+2. **Birth dates** — pull the Chadwick register (~20k rows, one extra download)
+   or drop the birth-cohort query?
+3. **Position** — FanGraphs stat pulls don't carry a clean primary position.
+   Derive from fielding innings, take it from Chadwick, or simplify to
+   batter/pitcher?
+4. **2025** — is the season complete in the data as of this load, and is a
+   partial season worth flagging in `seasons.note`?
+
+Items 1 and 2 each gate two of the Phase 3 queries, so they're worth deciding
+before the loader is written rather than after.
+
+---
+
+## 8. Files
+
+| File | Contents |
+|---|---|
+| `design/schema.sql` | `CREATE TABLE` / `CREATE VIEW` statements, constraints, indexes |
+| `design/er-diagram.svg` | E-R diagram, crow's-foot notation |
+| `design/make_er_diagram.py` | Regenerates the diagram — re-run after any schema change |
+| `design/schema-notes.md` | This document |
+
+**Verification:** `python3 -c "import sqlite3; sqlite3.connect(':memory:').executescript(open('design/schema.sql').read())"`
