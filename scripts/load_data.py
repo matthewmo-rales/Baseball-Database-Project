@@ -68,10 +68,6 @@ INFIELD = {"1B", "2B", "3B", "SS"}
 # but are not valid primary positions.
 NON_FIELDING = {"DH", "PH", "PR"}
 
-# players.throws CHECK allows only L/R. FanGraphs marks switch-pitchers
-# (Venditte, Seigler) as 'B', which the schema cannot hold -> NULL.
-THROWS = {"L", "R"}
-
 # pybaseball's chadwick_register() fetches this same archive but keeps only
 # names and ID keys -- it drops birth_year/month/day. Read the people files
 # directly so one download covers identity and birth date.
@@ -318,10 +314,7 @@ def load_stats(conn, kind, cache_dir, refresh) -> pd.DataFrame:
             if kind == "pitching":
                 row.append(ip_to_outs(rec["IP"]))
             row += [coerce(rec[src], typ) for src, (_, typ) in stat_map.items()]
-            hand = text(rec[hand_col])
-            if kind == "pitching" and hand not in THROWS:
-                hand = None
-            players.append((player_id, text(rec["PlayerName"]), hand,
+            players.append((player_id, text(rec["PlayerName"]), text(rec[hand_col]),
                             primary_position(rec["position"], label)))
             rows.append(row)
 

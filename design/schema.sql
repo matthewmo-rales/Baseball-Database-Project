@@ -92,7 +92,7 @@ CREATE TABLE players (
     last_name           TEXT,
     birth_date          DATE,                            -- from Chadwick register, not FanGraphs
     bats                TEXT    CHECK (bats   IN ('L','R','B')),
-    throws              TEXT    CHECK (throws IN ('L','R')),
+    throws              TEXT    CHECK (throws IN ('L','R', 'B')),
     primary_position    TEXT    CHECK (primary_position IN
                                 ('C','1B','2B','3B','SS','LF','CF','RF','DH','SP','RP','P','OF','IF')),
     debut_year          INTEGER,
@@ -351,7 +351,8 @@ SELECT  b.batting_id, b.player_id, p.full_name, p.birth_date, p.bats,
 FROM        batting_stats b
 JOIN        players   p ON p.player_id   = b.player_id
 LEFT JOIN   teams     t ON t.team_id     = b.team_id
-LEFT JOIN   divisions d ON d.division_id = t.division_id;
+LEFT JOIN   divisions d ON d.division_id = t.division_id
+WHERE b.plate_appearances > 0;
 
 CREATE VIEW v_pitching_season AS
 SELECT  s.pitching_id, s.player_id, p.full_name, p.throws, s.season_year,

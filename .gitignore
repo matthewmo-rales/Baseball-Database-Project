@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 database/baseball.db
 .env
+database/raw/chadwick_register.csv
