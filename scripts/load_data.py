@@ -8,8 +8,10 @@ Steps, in order:
      FanGraphs leaders JSON API (plus bats/throws/position for players)
   4. Player identity from the Chadwick register (names, IDs, birth date, debut)
   5. Team payroll from a CSV (team_id, season_year, payroll_usd)
-  6. Validation: recompute AVG/OBP/SLG/ERA/IP from loaded counting stats and
-     compare against the FanGraphs values. Any mismatch = bad load, exit 1.
+  6. Team results (G, W, L, RS, RA) from the same API's team totals (team=0,ts)
+  7. Validation: recompute AVG/OBP/SLG/ERA/IP from loaded counting stats and
+     compare against the FanGraphs values; check league-wide W = L and RS = RA.
+     Any mismatch = bad load, exit 1.
 
 Every raw pull is cached as CSV under database/raw/ and reused on later runs,
 so a reload is reproducible against the same snapshot (FanGraphs revises WAR
@@ -116,6 +118,17 @@ CACHE_COLS = {
     "pitching": [*IDENTITY_COLS, "Throws", "IP", *PITCHING_MAP, "ERA"],
 }
 
+# Team totals (team=0,ts): one row per club. W/L exist only in the pitching
+# feed (summed pitcher decisions = team record). Both feeds' `G` is a sum of
+# player appearances, not team games; pitching GS is the team's game count.
+TEAM_MAP = {
+    "batting": {"R": ("runs_scored", int)},
+    "pitching": {"GS": ("games_played", int), "W": ("wins", int),
+                 "L": ("losses", int), "R": ("runs_allowed", int)},
+}
+TEAM_CACHE_COLS = {kind: ["TeamNameAbb", "Season", *cols] for kind, cols in TEAM_MAP.items()}
+TEAMS_PER_SEASON = 30
+
 PLAYER_SQL = {
     # Seasons load oldest-first, so the latest non-null value wins.
     "batting": """
@@ -216,13 +229,21 @@ def upsert_sql(table: str, columns: list[str], conflict: str) -> str:
 # ---------------------------------------------------------------------------
 # FanGraphs pulls
 # ---------------------------------------------------------------------------
-def pull_fangraphs(kind: str, year: int) -> pd.DataFrame:
-    """One season from the FanGraphs leaders JSON API, trimmed to CACHE_COLS."""
+def pull_fangraphs(kind: str, year: int, teams: bool = False) -> pd.DataFrame:
+    """
+    One season from the FanGraphs leaders JSON API, trimmed to CACHE_COLS.
+    teams=True asks for team totals (team=0,ts) instead of per-player rows.
+    """
     params = {
         "pos": "all", "stats": "bat" if kind == "batting" else "pit", "lg": "all",
-        "qual": 0, "season": year, "season1": year, "month": 0, "team": 0,
+        "qual": 0, "season": year, "season1": year, "month": 0,
+        "team": "0,ts" if teams else 0,
         "ind": 1, "rost": 0, "type": 8, "pageitems": PAGE_ITEMS, "pagenum": 1,
     }
+    if teams:
+        kind, cols = f"team {kind}", TEAM_CACHE_COLS[kind]
+    else:
+        cols = CACHE_COLS[kind]
     print(f"  pulling {kind} {year} from FanGraphs ...")
     try:
         resp = requests.get(FANGRAPHS_API, params=params,
@@ -238,8 +259,8 @@ def pull_fangraphs(kind: str, year: int) -> pd.DataFrame:
         raise LoadError(f"{kind} {year}: got {len(rows)} of totalCount={total} rows "
                         f"-- pagination is truncating (raise PAGE_ITEMS)")
     df = pd.DataFrame(rows)
-    require_columns(df, CACHE_COLS[kind], f"{kind} {year}")
-    return df[CACHE_COLS[kind]]
+    require_columns(df, cols, f"{kind} {year}")
+    return df[cols]
 
 
 def fetch_season(kind: str, year: int, cache_dir: Path, refresh: bool) -> pd.DataFrame:
@@ -264,6 +285,24 @@ def fetch_season(kind: str, year: int, cache_dir: Path, refresh: bool) -> pd.Dat
             f"{kind} {year}: only {len(df)} rows. Expected well over {MIN_ROWS[kind]} "
             f"-- the qualified-players filter is probably on (need qual=0)."
         )
+    return df
+
+
+def fetch_team_season(kind: str, year: int, cache_dir: Path, refresh: bool) -> pd.DataFrame:
+    cache_file = cache_dir / f"team_{kind}_{year}.csv"
+    if cache_file.exists() and not refresh:
+        df = pd.read_csv(cache_file, encoding="utf-8-sig")
+        require_columns(df, TEAM_CACHE_COLS[kind], cache_file.name)
+    else:
+        df = pull_fangraphs(kind, year, teams=True)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(cache_file, index=False, encoding="utf-8")
+
+    if not (df["Season"] == year).all():
+        raise LoadError(f"{cache_file.name}: contains seasons other than {year} (was ind=1 used?)")
+    if len(df) != TEAMS_PER_SEASON:
+        raise LoadError(f"team {kind} {year}: {len(df)} rows, expected {TEAMS_PER_SEASON} "
+                        f"-- was team=0,ts used?")
     return df
 
 
@@ -400,14 +439,50 @@ def load_payroll(conn, path: Path) -> None:
 
     rows = [(str(r["team_id"]).strip(), coerce(r["season_year"], int), coerce(r["payroll_usd"], int))
             for r in df.to_dict("records")]
-    # team_stats W/L/RS/RA come from a separate source; only payroll is set here,
-    # and a later team-results load can fill the rest without clobbering it.
+    # Only payroll is set here; load_team_results() fills G/W/L/RS/RA on the
+    # same rows without touching payroll_usd.
     with conn:
         conn.executemany(
             upsert_sql("team_stats", ["team_id", "season_year", "payroll_usd"], "team_id, season_year"),
             rows,
         )
     print(f"  {len(rows):,} team-season payroll rows")
+
+
+# ---------------------------------------------------------------------------
+# team results
+# ---------------------------------------------------------------------------
+def load_team_results(conn, cache_dir, refresh) -> None:
+    team_map = dict(conn.execute("SELECT fangraphs_abbrev, team_id FROM teams"))
+    columns = ["team_id", "season_year"] + [col for m in TEAM_MAP.values() for col, _ in m.values()]
+    # upsert_sql only SETs the listed columns, so payroll_usd from step 6 survives.
+    sql = upsert_sql("team_stats", columns, "team_id, season_year")
+
+    total = 0
+    for year in SEASONS:
+        merged = None
+        for kind, stat_map in TEAM_MAP.items():
+            df = fetch_team_season(kind, year, cache_dir, refresh)
+            label = f"team {kind} {year}"
+            recs = {}
+            for rec in df.to_dict("records"):
+                team_id, multi = resolve_team(rec["TeamNameAbb"], team_map, label)
+                if multi:
+                    raise LoadError(f"{label}: multi-team label {rec['TeamNameAbb']!r} in team totals")
+                if team_id in recs:
+                    raise LoadError(f"{label}: {team_id} appears more than once")
+                recs[team_id] = [coerce(rec[src], typ) for src, (_, typ) in stat_map.items()]
+            if merged is None:
+                merged = recs
+            elif recs.keys() != merged.keys():
+                raise LoadError(f"team {year}: batting and pitching feeds list different teams")
+            else:
+                merged = {t: merged[t] + recs[t] for t in merged}
+
+        with conn:
+            conn.executemany(sql, [[team_id, year, *vals] for team_id, vals in merged.items()])
+        total += len(merged)
+    print(f"  {total:,} team-season result rows")
 
 
 # ---------------------------------------------------------------------------
@@ -443,6 +518,19 @@ def validate(conn, batting_raw, pitching_raw) -> int:
     bad += compare("pitching", pit, [("ip_display", "IP")], 0.001)
     bad += compare("pitching", pit[pit["outs_recorded"] > 0], [("era", "ERA")], 0.006)
 
+    # Every game has one winner and one loser, and every run scored is a run
+    # allowed, so league-wide totals must balance exactly within each season.
+    for year, w, l, rs, ra in conn.execute(
+            """SELECT season_year, SUM(wins), SUM(losses), SUM(runs_scored), SUM(runs_allowed)
+                 FROM team_stats GROUP BY season_year ORDER BY season_year"""):
+        if w != l or rs != ra:
+            print(f"  MISMATCH team_stats {year}: W={w} L={l} RS={rs} RA={ra}")
+            bad += 1
+    missing = conn.execute("SELECT COUNT(*) FROM team_stats WHERE wins IS NULL").fetchone()[0]
+    if missing:
+        print(f"  MISSING team_stats results: {missing} rows with NULL wins")
+        bad += missing
+
     counts = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
               for t in ("players", "batting_stats", "pitching_stats", "team_stats")}
     print("  " + ", ".join(f"{t}={n:,}" for t, n in counts.items()))
@@ -464,13 +552,14 @@ def main() -> int:
 
     conn = connect(args.db)
     try:
-        print("[1/7] schema");     run_sql_file(conn, SCHEMA_SQL)
-        print("[2/7] reference");  run_sql_file(conn, SEED_SQL)
-        print("[3/7] batting");    batting = load_stats(conn, "batting", args.cache_dir, args.refresh)
-        print("[4/7] pitching");   pitching = load_stats(conn, "pitching", args.cache_dir, args.refresh)
-        print("[5/7] identity");   load_chadwick(conn, args.cache_dir, args.refresh)
-        print("[6/7] payroll");    load_payroll(conn, args.payroll)
-        print("[7/7] validation"); bad = validate(conn, batting, pitching)
+        print("[1/8] schema");     run_sql_file(conn, SCHEMA_SQL)
+        print("[2/8] reference");  run_sql_file(conn, SEED_SQL)
+        print("[3/8] batting");    batting = load_stats(conn, "batting", args.cache_dir, args.refresh)
+        print("[4/8] pitching");   pitching = load_stats(conn, "pitching", args.cache_dir, args.refresh)
+        print("[5/8] identity");   load_chadwick(conn, args.cache_dir, args.refresh)
+        print("[6/8] payroll");    load_payroll(conn, args.payroll)
+        print("[7/8] team results"); load_team_results(conn, args.cache_dir, args.refresh)
+        print("[8/8] validation"); bad = validate(conn, batting, pitching)
     except LoadError as exc:
         print(f"\nLOAD FAILED: {exc}", file=sys.stderr)
         return 1
