@@ -1,6 +1,6 @@
 # Phase 3 query verification
 
-Verification log for `queries/analysis.sql` (Q01–Q20, with Q12 split into Q12a/Q12b = 21 blocks) against `database/baseball.db`. Regenerated after the final review (Q20 ties, Q14 wording, Q16 finding, human checks for Q05/Q06/Q17/Q18).
+Verification log for `queries/analysis.sql` (Q01–Q20, with Q12 split into Q12a/Q12b = 21 blocks) against `database/baseball.db`. Regenerated after the final review (Q20 ties, Q14 wording, Q16 finding, human checks for Q05/Q06/Q17/Q18); Q01 RANK change added afterwards.
 
 Summary: **21 of 21 blocks run without error.** Verdicts: PASS 20, FINDING 1. FINDING = the original expectation failed and the header now records the actual result. Q16 is PASS, recorded as a finding in its header.
 
@@ -60,6 +60,7 @@ Also: every `Verified: TODO` line was filled in. Checked facts were marked `PASS
 | 13 | Verified line reworded: the positional adjustment equalizes positions, so differences reflect talent concentration (SS/3B deepest, 1B thinnest); "matching the adjustment" claim removed; O3 dropped | Q14 |
 | 14 | Verified = PASS as a finding: MI/CI peak 26–27; C/OF no improvement after first qualifying age, likely selection; no peak-age claim for C/OF (resolves O2) | Q16 |
 | 15 | Human checks recorded as PASS in the owner's wording (resolves O4) | Q05, Q06, Q17, Q18 |
+| 16 | `ROW_NUMBER()` → `RANK()` to match Q20; no ties appeared, still 110 rows | Q01 |
 
 ## 5. Per-query results
 
@@ -92,8 +93,8 @@ Runtimes are single runs on this machine.
 ### Q01: PASS
 
 - Rows: 110 · Runtime: 20.1 ms · Errors: none
-- Header says: *PASS. 2022 rank 1 = Aaron Judge (NYY, .458 wOBA, 206 wRC+).*
-- Check: 2022 #1 = Aaron Judge, NYY, .458 wOBA, 206 wRC+. 2020 threshold scaled (Soto qualifies at 196 PA ≥ 186).
+- Header says: *PASS. 2022 rank 1 = Aaron Judge (NYY, .458 wOBA, 206 wRC+). RANK re-run: 110 rows, 10 per season, no ties in any season.*
+- Check: 2022 #1 = Aaron Judge, NYY, .458 wOBA, 206 wRC+. 2020 threshold scaled (Soto qualifies at 196 PA ≥ 186). Now RANK() instead of ROW_NUMBER(): **no ties appeared**, output unchanged at 110 rows (10 per season). wOBA is stored unrounded (e.g. 0.46116…), so exact ties are rare; 6 pairs look tied at 3 decimals (e.g. 2021 .391, 2020 .413) but are ranked by full value.
 
 | season_year | woba_rank | name | team | pa | woba | wrc_plus |
 |---|---|---|---|---|---|---|

@@ -47,11 +47,14 @@
 -- Q01: Top 10 hitters by wOBA each season (qualified)
 -- Business question: Who were the best overall hitters each year, by the
 --   metric front offices actually use instead of batting average?
--- Technique: ROW_NUMBER() partitioned by season in a CTE (SQLite has no
+-- Technique: RANK() partitioned by season in a CTE (SQLite has no
 --   QUALIFY); 4-table join; LEFT JOIN so multi-team players aren't dropped.
 -- Caveats: Qualified = 3.1 PA per scheduled team game (MLB rule), so the
---   2020 threshold scales automatically. ROW_NUMBER breaks ties arbitrarily.
+--   2020 threshold scales automatically. RANK keeps ties, so a season can
+--   return more than 10 rows. wOBA is stored unrounded, so exact ties are
+--   rare; rows that look tied at 3 decimals are still ranked by full value.
 -- Verified: PASS. 2022 rank 1 = Aaron Judge (NYY, .458 wOBA, 206 wRC+).
+--   RANK re-run: 110 rows, 10 per season, no ties in any season.
 WITH ranked AS (
     SELECT
         b.season_year,
@@ -60,7 +63,7 @@ WITH ranked AS (
         b.plate_appearances                  AS pa,
         b.woba,
         b.wrc_plus,
-        ROW_NUMBER() OVER (
+        RANK() OVER (
             PARTITION BY b.season_year
             ORDER BY b.woba DESC
         ) AS woba_rank
