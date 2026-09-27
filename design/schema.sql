@@ -1,15 +1,16 @@
 -- ============================================================================
 -- Baseball Analytics Database — Relational Schema (Phase 1)
 -- Target DBMS : SQLite 3.35+ (generated columns require 3.31+)
--- Data source : pybaseball -> FanGraphs season aggregates, 2015-2025
+-- Data source : direct FanGraphs API loader (scripts/load_data.py ->
+--               /api/leaders/major-league/data), season aggregates, 2015-2025
 -- Author      : George Matthew Morales IV
 -- ============================================================================
 -- Design summary
---   7 relations, normalized to 3NF (see design/schema-notes.md for the proof
---   sketch and the three deliberate exceptions).
+--   7 relations in BCNF (see design/schema-notes.md for the proof sketch
+--   and the three documented exceptions).
 --   Grain of the two player fact tables is ONE ROW PER PLAYER PER SEASON,
---   which matches what pybaseball.batting_stats(year) / pitching_stats(year)
---   actually return.
+--   which matches what the FanGraphs leaders API returns per season
+--   (batting and pitching endpoints).
 -- ============================================================================
 
 PRAGMA foreign_keys = ON;
@@ -53,7 +54,7 @@ CREATE TABLE teams (
     division_id         TEXT    NOT NULL
                                 REFERENCES divisions(division_id)
                                 ON UPDATE CASCADE ON DELETE RESTRICT,
-    fangraphs_abbrev    TEXT,                            -- abbrev as it appears in pybaseball output
+    fangraphs_abbrev    TEXT,                            -- abbrev as it appears in FanGraphs API output
     first_season        INTEGER,
     last_season         INTEGER,                         -- NULL = still active
     CHECK (last_season IS NULL OR last_season >= first_season)
@@ -81,12 +82,12 @@ CREATE TABLE seasons (
 -- ---------------------------------------------------------------------------
 -- 4. players
 -- ---------------------------------------------------------------------------
--- player_id is the FanGraphs ID (pybaseball column `IDfg`) because that is the
+-- player_id is the FanGraphs ID (API field `playerid`) because that is the
 -- key the stat pulls arrive on. mlbam_id / bbref_id are carried so the DB can
 -- later join Statcast or Baseball-Reference data without a re-key.
 -- ---------------------------------------------------------------------------
 CREATE TABLE players (
-    player_id           INTEGER PRIMARY KEY,             -- FanGraphs IDfg
+    player_id           INTEGER PRIMARY KEY,             -- FanGraphs playerid
     full_name           TEXT    NOT NULL,
     first_name          TEXT,
     last_name           TEXT,
@@ -112,7 +113,7 @@ CREATE INDEX idx_players_name ON players(last_name, first_name);
 -- forcing every query to reason about a NULL.
 --
 -- Rate stats that are a pure function of the counting stats in this row are
--- GENERATED, not stored -- that is how the table stays in 3NF while still
+-- GENERATED, not stored -- that is how the table stays in BCNF while still
 -- exposing AVG/OBP/SLG/OPS to queries.
 -- Context-dependent metrics (wOBA, wRC+, WAR) ARE stored: they depend on
 -- league-wide run environment and park factors, not on this row, so they are
@@ -299,7 +300,7 @@ CREATE INDEX idx_pitching_war         ON pitching_stats(season_year, war DESC);
 -- 7. team_stats
 -- ---------------------------------------------------------------------------
 -- Grain: one row per team per season. payroll_usd is nullable because it is
--- NOT available from pybaseball and must be loaded from a separate source
+-- NOT in the FanGraphs leaders data and is loaded from a separate source
 -- (Spotrac / Cot's Contracts) -- 30 teams x 11 seasons = 330 rows.
 -- ---------------------------------------------------------------------------
 CREATE TABLE team_stats (
