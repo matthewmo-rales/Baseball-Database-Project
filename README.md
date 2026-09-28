@@ -121,4 +121,4 @@ Limitations:
 
 ## Author
 
-\<name\> · \<LinkedIn\> · \<email\>
+\George Morales · \ www.linkedin.com/in/matthew-morales-0bb858382 · \ matthewmorales300@gmail.com

@@ -22,11 +22,11 @@ python3 --version
 
 ## 2. Clone and install
 
-Replace `<repo-url>` with the repository's clone URL. The install step downloads about 30 packages; clone plus install took about a minute and a half in the check.
+ The install step downloads about 30 packages; clone plus install took about a minute and a half in the check.
 
 ```powershell
 # Windows PowerShell
-git clone <repo-url> Baseball-analytics-db
+git clone https://github.com/matthewmo-rales/Baseball-Database-Project Baseball-analytics-db
 cd Baseball-analytics-db
 py -3.14 -m venv venv
 venv\Scripts\Activate.ps1
@@ -35,7 +35,7 @@ pip install -r requirements.txt
 
 ```sh
 # macOS/Linux
-git clone <repo-url> Baseball-analytics-db
+git clone https://github.com/matthewmo-rales/Baseball-Database-Project Baseball-analytics-db
 cd Baseball-analytics-db
 python3 -m venv venv
 source venv/bin/activate
