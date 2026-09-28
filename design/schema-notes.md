@@ -203,10 +203,12 @@ documented one is a decision.
 
 2. **Imported metrics are snapshots.** FanGraphs recalculates WAR historically
    as its models change, so `war` is really "FanGraphs WAR as of the load date."
-   The schema does not version this, but `database/raw/` is committed, so the
-   snapshot those numbers came from is pinned in git even though the column
-   isn't. A `loaded_at` column or a `data_loads` table would be the schema-level
-   fix if loads ever need comparing directly.
+   The schema does not version this. The loader caches each pull in
+   `database/raw/` and rebuilds from that cache, so a local database stays tied
+   to one snapshot until `--refresh`. The cache is not in git (FanGraphs' terms
+   prohibit redistribution), so two fresh clones built on different dates can
+   hold different WAR values. A `loaded_at` column or a `data_loads` table would
+   be the schema-level fix if loads ever need comparing directly.
 
 3. **`payroll_usd` lives at the wrong native grain.** Payroll is
    contract-level data from a different source system, flattened to team-season.
@@ -229,7 +231,7 @@ Each of these would have caused a wrong or empty load. How the loader handles th
 | **`playerTeamId` is the player's *current* club**, not the season's | Use `TeamNameAbb`. Ohtani's 2023 row is the test case: `teamid` 1 (LAA, correct) vs `playerTeamId` 22 (LAD) |
 | **`Name` and `Team` are HTML anchors** | Use `PlayerName` and `TeamNameAbb` |
 | **No `birth_date`** in the stat feed | Read the Chadwick register archive directly. `pybaseball.chadwick_register()` is not usable here — it keeps only names and ID keys and discards `birth_year`/`birth_month`/`birth_day` |
-| **No payroll** in any FanGraphs feed | Manual CSV from Spotrac / Cot's Contracts — 330 rows |
+| **No payroll** in any FanGraphs feed | Manual CSV compiled from Spotrac and Cot's Contracts — 330 rows. Not in git; the loader leaves `payroll_usd` NULL without it |
 | **IP arrives as `186.2`** (186⅔, not 186.2) | Convert to `outs_recorded` at load (§3.1) |
 | **Zero-AB rows** report AVG/OBP/SLG as `0.0`; generated columns return NULL | Validation accepts NULL only where the source reports 0; NULL against any nonzero value still fails |
 | **Oakland is `ATH` in 2025**, `OAK` before | Loader aliases it (§3.7) |
@@ -279,7 +281,7 @@ Carried forward so they don't resurface later:
 All four questions Phase 1 left open were settled during the Phase 2 load:
 
 1. **Payroll — loaded.** 330 team-seasons of Opening Day payroll, hand-built
-   from Spotrac. Keeps the payroll-efficiency and undervalued-player queries
+   from Spotrac and Cot's Contracts. Keeps the payroll-efficiency and undervalued-player queries
    alive.
 2. **Birth dates — loaded.** From the raw Chadwick register, matching all 4,019
    players. `mlbam_id` and `bbref_id` came along with them, so Statcast and
@@ -305,9 +307,10 @@ hand-entered values and no planned query uses it.
 | `design/schema-notes.md` | This document |
 | `scripts/load_data.py` | Seven-step loader: schema → reference → batting → pitching → identity → payroll → validation |
 | `database/seed_reference.sql` | Divisions, teams and seasons (36 rows, hand-maintained) |
-| `database/payroll.csv` | Opening Day payroll, 30 teams × 11 seasons |
-| `database/raw/` | Trimmed API snapshots, committed so the DB rebuilds without a live pull |
+| `database/payroll.csv` | Opening Day payroll, 30 teams × 11 seasons. Gitignored, supplied locally (see `database/README.md`) |
+| `database/raw/` | Trimmed API snapshots and the Chadwick extract. Gitignored, created by `load_data.py --refresh` |
 | `database/baseball.db` | Generated — gitignored, rebuilt by the loader in seconds from `raw/` |
 
 **Verification:** `python scripts/load_data.py` — rebuilds from `database/raw/`
-and exits non-zero on any validation failure.
+(first run on a fresh clone: add `--refresh`) and exits non-zero on any
+validation failure.

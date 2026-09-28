@@ -1,6 +1,11 @@
-﻿venv/
+venv/
 __pycache__/
 *.pyc
 database/baseball.db
 .env
-database/raw/chadwick_register.csv
+
+# Source data is fetched or supplied locally, never committed.
+# FanGraphs pulls + Chadwick extract (created by load_data.py --refresh):
+database/raw/
+# Hand-compiled payroll (Spotrac / Cot's Contracts), optional:
+database/payroll.csv

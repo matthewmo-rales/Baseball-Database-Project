@@ -7,15 +7,18 @@ Steps, in order:
   3. FanGraphs batting + pitching season aggregates, 2015-2025, from the
      FanGraphs leaders JSON API (plus bats/throws/position for players)
   4. Player identity from the Chadwick register (names, IDs, birth date, debut)
-  5. Team payroll from a CSV (team_id, season_year, payroll_usd)
+  5. Team payroll from a CSV (team_id, season_year, payroll_usd). Optional:
+     without the file, payroll_usd stays NULL and everything else loads.
   6. Team results (G, W, L, RS, RA) from the same API's team totals (team=0,ts)
   7. Validation: recompute AVG/OBP/SLG/ERA/IP from loaded counting stats and
      compare against the FanGraphs values; check league-wide W = L and RS = RA.
      Any mismatch = bad load, exit 1.
 
 Every raw pull is cached as CSV under database/raw/ and reused on later runs,
-so a reload is reproducible against the same snapshot (FanGraphs revises WAR
-historically -- see schema-notes.md section 4.2). Pass --refresh to re-pull.
+so a reload is reproducible against the same local snapshot (FanGraphs revises
+WAR historically -- see schema-notes.md section 4.2). The FanGraphs cache is
+not in git (their terms prohibit redistribution), so the first run on a fresh
+clone must use --refresh. Without --refresh, missing cache files are an error.
 
 Usage:
     python scripts/load_data.py [--refresh] [--payroll PATH]
@@ -429,9 +432,15 @@ def load_chadwick(conn, cache_dir, refresh) -> None:
 # ---------------------------------------------------------------------------
 # payroll
 # ---------------------------------------------------------------------------
-def load_payroll(conn, path: Path) -> None:
+def load_payroll(conn, path: Path, required: bool) -> bool:
+    """Returns False (payroll_usd left NULL) when the default file is absent."""
     if not path.exists():
-        raise LoadError(f"payroll file not found: {path}")
+        if required:
+            raise LoadError(f"payroll file not found: {path}")
+        print(f"  WARNING: {path} not found; payroll_usd left NULL.\n"
+              f"  Features that need it: Q03 (payroll efficiency), Q11 (cost per WAR), payroll charts.\n"
+              f"  See database/README.md for the expected CSV format.")
+        return False
     df = pd.read_csv(path, encoding="utf-8-sig")
     require_columns(df, ["team_id", "season_year", "payroll_usd"], path.name)
     if df.duplicated(["team_id", "season_year"]).any():
@@ -447,6 +456,7 @@ def load_payroll(conn, path: Path) -> None:
             rows,
         )
     print(f"  {len(rows):,} team-season payroll rows")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -542,13 +552,31 @@ def validate(conn, batting_raw, pitching_raw) -> int:
 
 
 # ---------------------------------------------------------------------------
+def missing_fangraphs_cache(cache_dir: Path) -> list[str]:
+    names = [f"{prefix}{kind}_{year}.csv"
+             for prefix in ("", "team_") for kind in ("batting", "pitching") for year in SEASONS]
+    return [n for n in names if not (cache_dir / n).exists()]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--refresh", action="store_true", help="re-pull sources instead of using database/raw/ cache")
-    ap.add_argument("--payroll", type=Path, default=DEFAULT_PAYROLL, help="payroll CSV (default: %(default)s)")
+    ap.add_argument("--payroll", type=Path, default=None,
+                    help=f"payroll CSV (default: {DEFAULT_PAYROLL}, skipped with a warning if absent)")
     ap.add_argument("--db", type=Path, default=DEFAULT_DB, help="output database (default: %(default)s)")
     ap.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE, help="raw pull cache (default: %(default)s)")
     args = ap.parse_args()
+
+    # Check before connect(): the schema step drops every table, so failing
+    # here leaves an existing database untouched.
+    if not args.refresh:
+        missing = missing_fangraphs_cache(args.cache_dir)
+        if missing:
+            print(f"LOAD FAILED: {len(missing)} FanGraphs cache files missing from {args.cache_dir} "
+                  f"(e.g. {missing[0]}).\n"
+                  f"They are not in git. Run:  python scripts/load_data.py --refresh",
+                  file=sys.stderr)
+            return 1
 
     conn = connect(args.db)
     try:
@@ -557,7 +585,8 @@ def main() -> int:
         print("[3/8] batting");    batting = load_stats(conn, "batting", args.cache_dir, args.refresh)
         print("[4/8] pitching");   pitching = load_stats(conn, "pitching", args.cache_dir, args.refresh)
         print("[5/8] identity");   load_chadwick(conn, args.cache_dir, args.refresh)
-        print("[6/8] payroll");    load_payroll(conn, args.payroll)
+        print("[6/8] payroll");    has_payroll = load_payroll(conn, args.payroll or DEFAULT_PAYROLL,
+                                                              required=args.payroll is not None)
         print("[7/8] team results"); load_team_results(conn, args.cache_dir, args.refresh)
         print("[8/8] validation"); bad = validate(conn, batting, pitching)
     except LoadError as exc:
@@ -569,7 +598,7 @@ def main() -> int:
     if bad:
         print(f"\nVALIDATION FAILED: {bad} mismatched values -- treat this load as bad.", file=sys.stderr)
         return 1
-    print(f"\nOK: {args.db}")
+    print(f"\nOK: {args.db}" + ("" if has_payroll else " (without payroll: Q03, Q11 and payroll charts need it)"))
     return 0
 
 

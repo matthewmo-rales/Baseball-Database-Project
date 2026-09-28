@@ -184,7 +184,7 @@ The original project brief proposed several queries the data cannot support. Eac
 
 ## How to run the queries
 
-Build the database first if it isn't there: `python scripts/load_data.py` (reads the committed files in `database/raw/`, takes seconds).
+Build the database first if it isn't there; see [database/README.md](../database/README.md). Q03 and Q11 need the optional payroll file.
 
 ### DB Browser for SQLite
 
