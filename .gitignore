@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 database/baseball.db
 .env
+instance/
+.pytest_cache/
+.DS_Store
 
 # Source data is fetched or supplied locally, never committed.
 # FanGraphs pulls + Chadwick extract (created by load_data.py --refresh):

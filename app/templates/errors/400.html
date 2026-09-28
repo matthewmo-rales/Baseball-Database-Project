@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Bad request · Baseball Analytics{% endblock %}
+{% block content %}
+<h1>Bad request</h1>
+<p>That request couldn't be understood. Check the address or the values you entered.</p>
+<p><a href="{{ url_for('main.index') }}">Back to player search</a></p>
+{% endblock %}

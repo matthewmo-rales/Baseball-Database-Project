@@ -1,0 +1,14 @@
+# Direct dependencies, pinned to the versions tested (Python 3.14, SQLite 3.50.4).
+# No pybaseball: it scrapes a retired FanGraphs endpoint. See scripts/load_data.py.
+
+# Loader (scripts/load_data.py)
+pandas==3.0.6
+requests==2.34.2
+
+# Web app (app/)
+Flask==3.1.3
+Flask-WTF==1.3.0
+plotly==7.1.0
+
+# Tests
+pytest==9.1.1

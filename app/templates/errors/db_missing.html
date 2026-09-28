@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Database not built · Baseball Analytics{% endblock %}
+{% block content %}
+<h1>The database hasn't been built yet</h1>
+<p>The app reads <code>database/baseball.db</code>, which isn't there. From the project root, with the virtual environment active, run:</p>
+<pre><code>python scripts/load_data.py</code></pre>
+<p>On a fresh clone with no local data cache, add <code>--refresh</code> to pull the season data first. Then reload this page.</p>
+{% endblock %}
