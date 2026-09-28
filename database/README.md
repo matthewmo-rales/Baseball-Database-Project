@@ -4,16 +4,16 @@
 
 ## Build
 
-From the repo root, with Python 3:
+From the repo root, with Python 3 (full walkthrough for Windows and macOS/Linux: [SETUP.md](../SETUP.md)):
 
 ```sh
 python -m venv venv
 venv\Scripts\activate          # macOS/Linux: source venv/bin/activate
-pip install pandas requests
+pip install -r requirements.txt
 python scripts/load_data.py --refresh
 ```
 
-`--refresh` downloads the FanGraphs season data (2015–2025) and the Chadwick register into `database/raw/`. After that, `python scripts/load_data.py` rebuilds from that local cache in seconds. If the cache is missing and `--refresh` is not given, the loader stops and tells you to run with `--refresh`.
+`--refresh` downloads the FanGraphs season data (2015–2025) and the Chadwick register into `database/raw/`. Running the loader with `--refresh` fetches data from FanGraphs' API, and users are responsible for complying with FanGraphs' terms of service. After that, `python scripts/load_data.py` rebuilds from that local cache in seconds. If the cache is missing and `--refresh` is not given, the loader stops and tells you to run with `--refresh`.
 
 The loader validates the build (recomputed rate stats against FanGraphs, league-wide W = L and RS = RA, foreign-key check) and exits non-zero on any mismatch.
 
