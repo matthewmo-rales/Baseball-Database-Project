@@ -7,7 +7,8 @@ truncate.
 """
 import math
 
-# MLB qualification rules. The SQL below spells the same
+# MLB qualification rules (chart and baseline definitions: the app/charts.py
+# module docstring). The SQL below spells the same
 # constants inline; these are for the "needs N" text on the season page.
 PA_PER_GAME = 3.1
 OUTS_PER_GAME = 3

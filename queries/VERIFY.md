@@ -288,7 +288,7 @@ Runtimes are single runs on this machine.
 
 - Rows: 66 · Runtime: 11.4 ms · Errors: none
 - Header says: *PASS. The positional adjustment is designed to equalize positions, so differences reflect talent concentration in this window: SS (2.60 WAR/600 decade mean) and 3B (2.52) deepest, 1B thinnest (1.61).*
-- Check: Decade means of WAR/600: SS 2.60, 3B 2.52, 2B 1.96, OF 1.92, C 1.82, 1B 1.61. The positional adjustment is designed to equalize positions, so the spread reflects talent concentration in this window, not positional value. Earlier "matches the 1B adjustment" claim removed.
+- Check: Decade means of WAR/600: SS 2.60, 3B 2.52, 2B 1.96, OF 1.92, C 1.83, 1B 1.61. The positional adjustment is designed to equalize positions, so the spread reflects talent concentration in this window, not positional value. Earlier "matches the 1B adjustment" claim removed.
 
 | pos | season_year | players | war_per_600 | vs_decade_avg | yoy_change |
 |---|---|---|---|---|---|

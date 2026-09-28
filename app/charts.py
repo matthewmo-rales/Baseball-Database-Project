@@ -1,12 +1,23 @@
 """Plotly figures (built here in Python, rendered by static/js/charts.js) and the
 same-origin plotly.js bundle.
 
-Chart definition: combined WAR (batting + pitching via
-UNION ALL, exactly as Q05) scaled to 162 games, war * 162.0 / scheduled_games.
-The player chart adds a per-season leave-one-out baseline: the mean of the
-OTHER qualified hitters at the same unambiguous position (C/1B/2B/3B/SS/OF),
-or of the other qualified pitchers listed at P, shown only when at least 5
-others qualify. DH, IF and NULL get none. The compare chart has no baseline.
+Chart definitions (the reference for app/stats.py as well):
+
+- Metric: combined WAR (batting + pitching via UNION ALL, exactly as Q05)
+  scaled to 162 games, war * 162.0 / scheduled_games.
+- Baseline (player chart only): per season, a leave-one-out mean,
+  (group sum - own) / (n - 1), where "own" applies only when the player is
+  in that season's group.
+- Groups: qualified hitters (PA >= 3.1 * scheduled games) with the same
+  primary_position, for C/1B/2B/3B/SS/OF; for P, qualified pitchers
+  (outs >= 3 * scheduled games) listed at P only, still on combined WAR.
+  DH, IF and NULL get no baseline.
+- Minimum: a baseline point is drawn only when at least 5 OTHER qualified
+  players are in the group; otherwise the line has a gap.
+- The compare chart shows the two players' lines only, no baseline.
+- Batting rows shown on the player, season and compare pages: PA > 0, plus
+  PA = 0 rows when the player has no pitching row that season (pitchers'
+  0-PA placeholder rows stay hidden). stats.SHOWN_BATTING_ROW holds the rule.
 
 CSP: plotly.js normally injects a <style> element, which style-src 'self'
 blocks. It skips that step when an element with id "plotly.js-style-global"

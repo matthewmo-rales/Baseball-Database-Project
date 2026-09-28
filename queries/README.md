@@ -121,7 +121,7 @@ Every number below comes from VERIFY.md or from the query it names. Definitions 
 
 - **Business question:** Where is hitting talent deep or thin by position?
 - **Technique:** Aggregate CTE of PA-weighted WAR per 600 PA, then windows over the aggregates (position decade average, `LAG()` for year-over-year change).
-- **Key finding:** Decade means of WAR per 600 PA: SS 2.60, 3B 2.52, 2B 1.96, OF 1.92, C 1.82, 1B 1.61. (Q14)
+- **Key finding:** Decade means of WAR per 600 PA: SS 2.60, 3B 2.52, 2B 1.96, OF 1.92, C 1.83, 1B 1.61. (Q14)
 - **Main caveat:** WAR already includes a positional adjustment designed to equalize positions, so the spread reflects where talent was concentrated in this window, not the value of the position itself. No payroll by position exists.
 
 ## Tier 4: CTEs and predictive setup

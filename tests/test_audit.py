@@ -171,3 +171,23 @@ def test_no_instance_or_database_data_is_tracked():
     assert [f for f in tracked if f.startswith("database/")] == ["database/README.md",
                                                                  "database/seed_reference.sql"]
     assert not [f for f in tracked if f.endswith((".db", ".sqlite", ".env")) or "secret_key" in f]
+
+
+# Every Markdown file the repo publishes. A new doc must be added here on
+# purpose; anything else that ends up tracked fails the test below.
+TRACKED_MARKDOWN = {
+    "README.md",
+    "SETUP.md",
+    "SCHEMA.md",
+    "QUERIES.md",
+    "database/README.md",
+    "design/schema-notes.md",
+    "queries/ADVANCED_STATS_EXPLAINED.md",
+    "queries/README.md",
+    "queries/VERIFY.md",
+}
+
+
+def test_only_allowlisted_markdown_is_tracked():
+    tracked_md = {f for f in _git_ls_files() if f.lower().endswith(".md")}
+    assert tracked_md <= TRACKED_MARKDOWN, sorted(tracked_md - TRACKED_MARKDOWN)

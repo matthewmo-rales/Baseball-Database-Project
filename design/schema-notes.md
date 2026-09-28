@@ -115,9 +115,9 @@ Two categories of statistic, handled differently on principle:
 `VIRTUAL` (not `STORED`) means zero disk cost, computed on read. At this data
 volume the cost is negligible and the correctness guarantee is absolute.
 
-This split is also the cleanest interview answer to *"why did you normalize it
-that way?"* — the line isn't "normalize everything," it's **derivable stays
-derived, imported stays stored.**
+This split is the short answer to *"why is it normalized this way?"*: the
+line isn't "normalize everything," it's **derivable stays derived, imported
+stays stored.**
 
 ### 3.3 ERA+ is derived from ERA-, not re-sourced
 
@@ -151,7 +151,8 @@ season_year = 2020`.
 
 Ohtani appears in both `batting_stats` and `pitching_stats`, each FK'd to the
 same `players` row. This falls out of separating the fact tables by role rather
-than by player — worth naming explicitly, because interviewers ask.
+than by player, and it is worth naming explicitly because it is easy to
+assume two-way players need extra modeling.
 
 ### 3.7 Oakland's abbreviation changed mid-window
 
@@ -330,8 +331,7 @@ Carried forward so they don't resurface later:
 - **f-string SQL in the Flask route** (brief, Phase 4 `search_player`) is a SQL
   injection hole — `name` goes straight from the query string into the
   statement. Use parameter binding (`?`) everywhere, including `LIKE`:
-  `WHERE full_name LIKE ?` with `('%' + name + '%',)`. Worth doing right the
-  first time and worth mentioning in interviews.
+  `WHERE full_name LIKE ?` with `('%' + name + '%',)`.
 - **"6 core entities"** became 7 — `divisions` was split out to reach 3NF (§2).
   `player_notes` (§3.11) is an eighth, app-written relation, not a loaded entity.
 
