@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Edit note · {{ note.full_name }} · Baseball Analytics{% endblock %}
+{% block content %}
+{% with player=note %}{% include "notes/_player_header.html" %}{% endwith %}
+<h2>Edit note</h2>
+{% with action=url_for('notes.edit_note', note_id=note.note_id), submit_label="Save changes" %}
+  {% include "notes/_form.html" %}
+{% endwith %}
+<p><a href="{{ url_for('notes.list_notes', player_id=note.player_id) }}">Cancel, back to notes</a></p>
+{% endblock %}

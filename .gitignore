@@ -12,3 +12,9 @@ instance/
 database/raw/
 # Hand-compiled payroll (Spotrac / Cot's Contracts), optional:
 database/payroll.csv
+
+# App-written notes that a rebuild could not restore (player no longer in the
+# data), and the loader's in-progress build (+ its journal) before the swap:
+database/player_notes_orphans.json
+database/*.tmp
+database/*.tmp-*

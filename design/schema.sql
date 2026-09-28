@@ -6,8 +6,9 @@
 -- Author      : George Matthew Morales IV
 -- ============================================================================
 -- Design summary
---   7 relations in BCNF (see design/schema-notes.md for the proof sketch
---   and the three documented exceptions).
+--   8 relations in BCNF (see design/schema-notes.md for the proof sketch
+--   and the three documented exceptions). Seven hold loaded data; the
+--   eighth, player_notes, is written only by the Flask app.
 --   Grain of the two player fact tables is ONE ROW PER PLAYER PER SEASON,
 --   which matches what the FanGraphs leaders API returns per season
 --   (batting and pitching endpoints).
@@ -20,6 +21,7 @@ DROP VIEW  IF EXISTS v_batting_season;
 DROP TABLE IF EXISTS team_stats;
 DROP TABLE IF EXISTS pitching_stats;
 DROP TABLE IF EXISTS batting_stats;
+DROP TABLE IF EXISTS player_notes;
 DROP TABLE IF EXISTS players;
 DROP TABLE IF EXISTS teams;
 DROP TABLE IF EXISTS divisions;
@@ -335,6 +337,40 @@ CREATE TABLE team_stats (
 );
 
 CREATE INDEX idx_team_stats_season ON team_stats(season_year);
+
+
+-- ---------------------------------------------------------------------------
+-- 8. player_notes
+-- ---------------------------------------------------------------------------
+-- Grain: one row per note. The only relation the app writes (a sqlite3
+-- authorizer on the app's read-write connection denies every other table),
+-- and the only one the loader does not fill: 0 rows after a fresh load.
+-- The loader carries existing notes into each rebuild.
+--
+-- Same file as players on purpose: SQLite cannot enforce a foreign key
+-- across ATTACHed databases. ON DELETE RESTRICT, unlike the CASCADE on the
+-- fact tables: stat rows can be re-downloaded, user-written notes cannot.
+-- full_name is not copied here; player_id -> full_name would be a
+-- dependency between non-key attributes.
+--
+-- AUTOINCREMENT so a deleted note's id is never handed out again: ids appear
+-- in URLs and in the loader's orphans file, and must not come to mean a
+-- different note. The loader carries sqlite_sequence across rebuilds too.
+-- The body CHECK trims tab/LF/CR as well as spaces (plain trim() strips only
+-- spaces), matching the app's strip(), so a whitespace-only note is rejected.
+-- ---------------------------------------------------------------------------
+CREATE TABLE player_notes (
+    note_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id   INTEGER NOT NULL REFERENCES players(player_id)
+                        ON UPDATE CASCADE ON DELETE RESTRICT,
+    category    TEXT NOT NULL DEFAULT 'general'
+                CHECK (category IN ('hitting','pitching','defense','baserunning','general')),
+    body        TEXT NOT NULL
+                CHECK (length(trim(body, ' ' || char(9, 10, 13))) BETWEEN 1 AND 2000),
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+    updated_at  TEXT
+);
+CREATE INDEX idx_notes_player ON player_notes(player_id);
 
 
 -- ---------------------------------------------------------------------------

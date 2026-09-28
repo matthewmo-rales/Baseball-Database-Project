@@ -12,6 +12,13 @@
     <span class="tagline">MLB seasons 2015&ndash;2025</span>
   </header>
   <main class="content">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes" role="status">
+          {% for m in messages %}<li>{{ m }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
     {% block content %}{% endblock %}
   </main>
   <footer class="site-footer">

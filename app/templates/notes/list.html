@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Notes · {{ player.full_name }} · Baseball Analytics{% endblock %}
+{% block content %}
+{% include "notes/_player_header.html" %}
+
+<section class="notes-new">
+  <h2>Add a note</h2>
+  {% with action=url_for('notes.list_notes', player_id=player.player_id), submit_label="Save note" %}
+    {% include "notes/_form.html" %}
+  {% endwith %}
+</section>
+
+<section class="notes-list">
+  <h2>Notes <span class="count">({{ notes|length }})</span></h2>
+  {% if notes %}
+    <ol class="notes">
+      {% for n in notes %}
+      <li class="note">
+        <div class="note-meta">
+          <span class="tag">{{ n.category }}</span>
+          <span>Added {{ n.created_at|replace("T", " ")|replace("Z", " UTC") }}</span>
+          {% if n.updated_at %}<span>· edited {{ n.updated_at|replace("T", " ")|replace("Z", " UTC") }}</span>{% endif %}
+        </div>
+        <p class="note-body">{{ n.body }}</p>
+        <div class="note-actions">
+          <a href="{{ url_for('notes.edit_note', note_id=n.note_id) }}">Edit</a>
+          <form method="post" action="{{ url_for('notes.delete_note', note_id=n.note_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="link-button danger">Delete</button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p class="hint">No notes yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,8 @@
+{# Minimal player header until the player page arrives. Expects: player. #}
+<header class="player-header">
+  <h1>{{ player.full_name }}</h1>
+  <p class="player-meta">
+    Player ID <span class="mono">{{ player.player_id }}</span>
+    · Position {{ player.primary_position or "—" }}
+  </p>
+</header>

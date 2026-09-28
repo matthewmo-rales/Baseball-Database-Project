@@ -3,6 +3,8 @@
 All rows are fictional (IDs in the 900000s) so no test depends on, or
 reproduces, FanGraphs data.
 """
+import re
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -69,10 +71,35 @@ def build_test_db(path):
 
 
 @pytest.fixture(scope="session")
-def test_db_path(tmp_path_factory):
-    path = tmp_path_factory.mktemp("db") / "test.db"
+def template_db_path(tmp_path_factory):
+    path = tmp_path_factory.mktemp("db") / "template.db"
     build_test_db(path)
     return path
+
+
+@pytest.fixture
+def test_db_path(template_db_path, tmp_path):
+    """A fresh copy per test, since the notes tests write to it."""
+    path = tmp_path / "test.db"
+    shutil.copyfile(template_db_path, path)
+    return path
+
+
+def csrf_token(client, url):
+    """GET a form page and pull the CSRF token out of its hidden input."""
+    body = client.get(url).get_data(as_text=True)
+    match = re.search(r'name="csrf_token" type="hidden" value="([^"]+)"', body) or \
+        re.search(r'name="csrf_token" value="([^"]+)"', body)
+    assert match, "no CSRF token on " + url
+    return match.group(1)
+
+
+def query_db(path, sql, params=()):
+    conn = sqlite3.connect(path)
+    try:
+        return conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
 
 
 @pytest.fixture

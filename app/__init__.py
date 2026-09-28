@@ -9,6 +9,7 @@ from pathlib import Path
 
 from flask import Flask, render_template
 from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 
 from . import db
 
@@ -30,7 +31,14 @@ csrf = CSRFProtect()
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_path=str(PROJECT_ROOT / "instance"))
-    app.config.from_mapping(DATABASE=PROJECT_ROOT / "database" / "baseball.db")
+    app.config.from_mapping(
+        DATABASE=PROJECT_ROOT / "database" / "baseball.db",
+        SESSION_COOKIE_SAMESITE="Lax",
+        # SESSION_COOKIE_SECURE stays False: local dev is plain http, and a
+        # Secure cookie would never be sent back, breaking CSRF and flashes.
+        # Set it to True in any deployment behind HTTPS. HttpOnly is Flask's
+        # default (on) and is left alone.
+    )
     if test_config is not None:
         app.config.update(test_config)
     app.config["DATABASE"] = Path(app.config["DATABASE"]).resolve()
@@ -41,8 +49,9 @@ def create_app(test_config=None):
     csrf.init_app(app)
     db.init_app(app)
 
-    from . import main
+    from . import main, notes
     app.register_blueprint(main.bp)
+    app.register_blueprint(notes.bp)
 
     _register_security_headers(app)
     _register_error_handlers(app)
@@ -77,9 +86,18 @@ def _register_error_handlers(app):
     def bad_request(e):
         return render_template("errors/400.html"), 400
 
+    @app.errorhandler(CSRFError)
+    def csrf_failed(e):
+        return render_template("errors/400.html", csrf_failed=True), 400
+
     @app.errorhandler(404)
     def not_found(e):
         return render_template("errors/404.html"), 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(e):
+        # keep Werkzeug's Allow header, swap in the friendly body
+        return render_template("errors/405.html"), 405, {"Allow": ", ".join(e.valid_methods or [])}
 
     @app.errorhandler(500)
     def server_error(e):

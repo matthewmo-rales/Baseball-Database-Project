@@ -1,7 +1,7 @@
 # Schema Design Notes — Baseball Analytics Database
 - **Source:** FanGraphs JSON leaderboard API, 2015–2025
-- **Relations:** 7 · **Normal form:** BCNF, with three documented exceptions
-- **Status:** loaded and validated -  4,019 players, 15,521 batting and 8,968 pitching season rows, 330 team-seasons; every AVG/OBP/SLG/IP/ERA reconciles against source and `foreign_key_check` is clean
+- **Relations:** 8 (7 loaded, 1 app-written) · **Normal form:** BCNF, with three documented exceptions
+- **Status:** loaded and validated -  4,019 players, 15,521 batting and 8,968 pitching season rows, 330 team-seasons, 0 notes after a fresh load; every AVG/OBP/SLG/IP/ERA reconciles against source and `foreign_key_check` is clean
 
 ---
 
@@ -18,6 +18,7 @@ The single most important decision, because it determines what every downstream 
 | `batting_stats` | **one row per player per season** | 15,521 |
 | `pitching_stats` | **one row per player per season** | 8,968 |
 | `team_stats` | one row per team per season | 330 |
+| `player_notes` | one row per note (app-written, §3.11) | 0 after a fresh load |
 
 The FanGraphs leaderboard API returns one row per player per season, already
 aggregated across teams. The schema matches that grain rather than inventing a
@@ -68,6 +69,10 @@ key; none depends on another non-key attribute. **BCNF.**
 
 **`team_stats`** — candidate keys `{team_stat_id}` and `{team_id, season_year}`.
 **BCNF.**
+
+**`player_notes`** — `note_id →` everything else. The only candidate key: a
+player can have any number of notes, in any category, even with identical
+text, so no natural key exists. **BCNF.** Design rationale in §3.11.
 
 ### Why surrogate keys alongside natural keys
 
@@ -188,6 +193,61 @@ NULL. Position-based queries filter to the unambiguous set and say so —
 a primary position is not well-defined for a genuine utility player, and
 inventing one would be worse than excluding them.
 
+### 3.11 `player_notes`: the one relation the app writes
+
+Seven relations hold loaded data. The eighth holds scouting-style notes that
+users write through the Flask app (the project's CRUD requirement).
+
+- **Functional dependencies.** `note_id → player_id, category, body,
+  created_at, updated_at`. `note_id` is the only candidate key and the only
+  determinant, so the relation is in BCNF.
+- **No `full_name` column.** Copying the name onto each note would add
+  `player_id → full_name`, a dependency between non-key attributes (a 3NF
+  violation) and an update anomaly the first time a name is corrected. The
+  name is one join away.
+- **`category` is a CHECK enum, not a lookup table.** Five fixed values
+  (`hitting`, `pitching`, `defense`, `baserunning`, `general`) enforced by
+  `CHECK (category IN (...))`. A `note_categories` table would make a new
+  category a data change instead of a schema change, at the cost of a ninth
+  relation and a join on every read. With five values that rarely change, the
+  CHECK is simpler; the trade-off is that adding a category means editing
+  `schema.sql` and the app's form.
+- **The `body` CHECK trims tabs, CR and LF as well as spaces:**
+  `length(trim(body, ' ' || char(9, 10, 13))) BETWEEN 1 AND 2000`. SQLite's
+  one-argument `trim()` strips only spaces, so `'\n\n'` would have passed; the
+  database backstop now matches the app's `strip()`.
+- **`note_id` is `INTEGER PRIMARY KEY AUTOINCREMENT`,** so a deleted note's id
+  is never handed out again. Note ids appear in URLs and in the orphans file,
+  and must never come to point at a different note. The loader also carries
+  the `sqlite_sequence` high-water mark across rebuilds.
+- **Neither change affects normalization.** A CHECK and a key-generation rule
+  add no attributes and no dependencies: the FDs above are unchanged and the
+  relation stays in BCNF.
+- **Same database file as `players`.** SQLite cannot enforce a foreign key
+  across `ATTACH`ed databases, so a separate notes file would lose referential
+  integrity. Keeping one file keeps the FK real.
+- **`ON DELETE RESTRICT`, unlike the fact tables' `CASCADE`.** Stat rows can
+  be re-downloaded; notes are the only data in the database that cannot. A
+  player with notes cannot be deleted until the notes are dealt with.
+- **The loader carries notes across rebuilds, and the rebuild is atomic.** The
+  loader builds the complete new database in `<db>.tmp` and swaps it in with
+  `os.replace` only after validation passes. It reads existing notes (read-only)
+  before building, restores them with their original `note_id`, `created_at`
+  and `updated_at` before validation (so `foreign_key_check` covers them),
+  sets the new `sqlite_sequence` to the larger of its own and the old one, and
+  writes any note whose player is no longer in the data to
+  `database/player_notes_orphans.json` rather than dropping it. A failed load,
+  a failed validation, or a locked file at swap time leaves the old database,
+  notes included, byte-for-byte untouched. The earlier in-place rebuild could
+  not promise that: `executescript` commits each `DROP` as it runs, so a
+  failure partway through left a half-dropped database.
+- **It is the only relation the app can write.** Page reads use a `mode=ro`
+  connection. The notes POST handlers use a separate read-write connection
+  with a `sqlite3` authorizer that denies by default and allows only reads,
+  function calls, transactions, and `INSERT`/`UPDATE`/`DELETE` on
+  `player_notes`. DDL, `ATTACH`, `PRAGMA` and writes to any other table are
+  refused by SQLite itself, whatever SQL a handler sends.
+
 ---
 
 ## 4. Deliberate exceptions to strict normalization
@@ -273,6 +333,7 @@ Carried forward so they don't resurface later:
   `WHERE full_name LIKE ?` with `('%' + name + '%',)`. Worth doing right the
   first time and worth mentioning in interviews.
 - **"6 core entities"** became 7 — `divisions` was split out to reach 3NF (§2).
+  `player_notes` (§3.11) is an eighth, app-written relation, not a loaded entity.
 
 ---
 
@@ -305,7 +366,7 @@ hand-entered values and no planned query uses it.
 | `design/schema.sql` | `CREATE TABLE` / `CREATE VIEW` statements, constraints, indexes |
 | `design/er-diagram.svg` | E-R diagram, crow's-foot notation |
 | `design/schema-notes.md` | This document |
-| `scripts/load_data.py` | Seven-step loader: schema → reference → batting → pitching → identity → payroll → validation |
+| `scripts/load_data.py` | Atomic loader: read existing notes → build `<db>.tmp` (schema → reference → batting → pitching → identity → payroll → team results → restore notes → validation) → swap in |
 | `database/seed_reference.sql` | Divisions, teams and seasons (36 rows, hand-maintained) |
 | `database/payroll.csv` | Opening Day payroll, 30 teams × 11 seasons. Gitignored, supplied locally (see `database/README.md`) |
 | `database/raw/` | Trimmed API snapshots and the Chadwick extract. Gitignored, created by `load_data.py --refresh` |
@@ -313,4 +374,4 @@ hand-entered values and no planned query uses it.
 
 **Verification:** `python scripts/load_data.py` — rebuilds from `database/raw/`
 (first run on a fresh clone: add `--refresh`) and exits non-zero on any
-validation failure.
+validation failure, leaving the existing database unchanged.

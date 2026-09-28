@@ -9,6 +9,9 @@
   --row-alt: #f3f5f8;
   --notice-bg: #fff7e0;
   --notice-border: #e0c36a;
+  --flash-bg: #e8f3ec;
+  --flash-border: #8cc0a0;
+  --error: #b3261e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,6 +26,9 @@
     --row-alt: #20262e;
     --notice-bg: #2b2616;
     --notice-border: #7a6a2f;
+    --flash-bg: #16291e;
+    --flash-border: #3d6b4f;
+    --error: #f2b8b5;
   }
 }
 
@@ -103,6 +109,85 @@ pre {
   border: 1px solid var(--border);
   border-radius: 6px;
 }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.flashes { list-style: none; margin: 0 0 1rem; padding: 0; }
+.flashes li {
+  padding: 8px 12px;
+  background: var(--flash-bg);
+  border: 1px solid var(--flash-border);
+  border-radius: 6px;
+}
+
+h2 { font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
+h2 .count { color: var(--muted); font-weight: 400; }
+.player-header h1 { margin-bottom: 0.25rem; }
+.player-meta { margin: 0 0 1rem; color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+.note-form .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.note-form label { font-weight: 600; }
+.note-form select, .note-form textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.note-form select { max-width: 220px; }
+.note-form textarea { width: 100%; resize: vertical; }
+.note-form button {
+  align-self: flex-start;
+  padding: 8px 16px;
+  font: inherit;
+  color: #fff;
+  background: #1f5f9e;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.note-form button:hover { background: #174a7c; }
+.field-hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.field-error { margin: 0; color: var(--error); font-size: 0.9rem; font-weight: 600; }
+
+.notes { list-style: none; margin: 0; padding: 0; }
+.note {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.note-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); font-size: 0.85rem; }
+.tag {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+}
+/* Line breaks in notes render via CSS, never by injecting <br> markup. */
+.note-body { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-actions { display: flex; gap: 16px; align-items: center; font-size: 0.9rem; }
+.note-actions form { margin: 0; }
+.link-button {
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-button.danger { color: var(--error); }
 
 .site-footer {
   padding-top: 12px;

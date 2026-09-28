@@ -1,0 +1,16 @@
+{# Shared note form. Expects: form, body_max, action, submit_label. #}
+<form class="note-form" method="post" action="{{ action }}" novalidate>
+  {{ form.hidden_tag() }}
+  <div class="field">
+    {{ form.category.label }}
+    {{ form.category() }}
+    {% for err in form.category.errors %}<p class="field-error">{{ err }}</p>{% endfor %}
+  </div>
+  <div class="field">
+    {{ form.body.label }}
+    {{ form.body(rows=6, maxlength=body_max) }}
+    <p class="field-hint">Up to {{ "{:,}".format(body_max) }} characters.</p>
+    {% for err in form.body.errors %}<p class="field-error">{{ err }}</p>{% endfor %}
+  </div>
+  <button type="submit">{{ submit_label }}</button>
+</form>

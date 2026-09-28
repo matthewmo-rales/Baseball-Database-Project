@@ -1,8 +1,13 @@
 """
 Phase 2 loader: build database/baseball.db from scratch.
 
+The rebuild is atomic: everything is built in <db>.tmp next to the target and
+swapped in with os.replace() only after validation passes. Until then the
+existing database -- including the app-written player_notes -- is untouched.
+
 Steps, in order:
-  1. design/schema.sql            -- drops and recreates every table/view
+  0. Read existing player_notes (read-only) so they can be carried over
+  1. design/schema.sql            -- creates every table/view in <db>.tmp
   2. database/seed_reference.sql  -- divisions, teams, seasons
   3. FanGraphs batting + pitching season aggregates, 2015-2025, from the
      FanGraphs leaders JSON API (plus bats/throws/position for players)
@@ -12,7 +17,9 @@ Steps, in order:
   6. Team results (G, W, L, RS, RA) from the same API's team totals (team=0,ts)
   7. Validation: recompute AVG/OBP/SLG/ERA/IP from loaded counting stats and
      compare against the FanGraphs values; check league-wide W = L and RS = RA.
-     Any mismatch = bad load, exit 1.
+     Any mismatch = bad load, exit 1. Notes are restored just before this
+     step, so foreign_key_check covers them. Notes whose player_id no longer
+     exists go to database/player_notes_orphans.json instead of being dropped.
 
 Every raw pull is cached as CSV under database/raw/ and reused on later runs,
 so a reload is reproducible against the same local snapshot (FanGraphs revises
@@ -26,6 +33,8 @@ Usage:
 
 import argparse
 import io
+import json
+import os
 import re
 import sqlite3
 import sys
@@ -42,6 +51,7 @@ SEED_SQL = REPO / "database" / "seed_reference.sql"
 DEFAULT_DB = REPO / "database" / "baseball.db"
 DEFAULT_CACHE = REPO / "database" / "raw"
 DEFAULT_PAYROLL = REPO / "database" / "payroll.csv"
+ORPHANS_NAME = "player_notes_orphans.json"   # written next to the target DB
 
 SEASONS = range(2015, 2026)
 
@@ -496,6 +506,87 @@ def load_team_results(conn, cache_dir, refresh) -> None:
 
 
 # ---------------------------------------------------------------------------
+# player_notes (app-written; carried across rebuilds)
+# ---------------------------------------------------------------------------
+def read_notes(db_path: Path) -> tuple[list[dict], int]:
+    """All player_notes rows and the AUTOINCREMENT high-water mark, read-only.
+
+    Returns ([], 0) when there is no DB yet or it predates player_notes. The
+    sequence is 0 when sqlite_sequence has no player_notes row (or does not
+    exist, as in a DB built before note_id was AUTOINCREMENT).
+    """
+    if not db_path.is_file():
+        return [], 0
+    conn = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True)
+    try:
+        conn.row_factory = sqlite3.Row
+        tables = {name for (name,) in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('player_notes', 'sqlite_sequence')")}
+        if "player_notes" not in tables:
+            return [], 0
+        rows = [dict(r) for r in conn.execute(
+            """SELECT note_id, player_id, category, body, created_at, updated_at
+                 FROM player_notes ORDER BY note_id""")]
+        seq = 0
+        if "sqlite_sequence" in tables:
+            found = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'player_notes'").fetchone()
+            seq = found[0] if found else 0
+        return rows, seq
+    finally:
+        conn.close()
+
+
+def restore_notes(conn: sqlite3.Connection, rows: list[dict], old_seq: int = 0) -> list[dict]:
+    """Reinsert notes with their original note_id and timestamps, then carry
+    the AUTOINCREMENT sequence forward so no note_id is ever reused.
+
+    Returns the orphans: notes whose player_id is not in the new players table.
+    A note that fails a CHECK raises sqlite3.IntegrityError, which fails the
+    load before the swap, so the old DB keeps it.
+    """
+    loaded = {pid for (pid,) in conn.execute("SELECT player_id FROM players")}
+    keep = [r for r in rows if r["player_id"] in loaded]
+    orphans = [r for r in rows if r["player_id"] not in loaded]
+    with conn:
+        conn.executemany(
+            """INSERT INTO player_notes (note_id, player_id, category, body, created_at, updated_at)
+               VALUES (:note_id, :player_id, :category, :body, :created_at, :updated_at)""",
+            keep,
+        )
+        # Explicit-id inserts already raised seq to MAX(note_id). The old seq
+        # can be higher (newest notes deleted, or orphaned); keep the larger.
+        # sqlite_sequence has no UNIQUE on name, so update-then-insert.
+        updated = conn.execute(
+            "UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'player_notes'", (old_seq,)
+        ).rowcount
+        if not updated and old_seq > 0:
+            conn.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('player_notes', ?)", (old_seq,))
+    print(f"  restored {len(keep):,} of {len(rows):,} notes (next note_id > "
+          f"{max([old_seq] + [r['note_id'] for r in keep])})")
+    return orphans
+
+
+def save_orphans(path: Path, orphans: list[dict]) -> int:
+    """Append orphans to the JSON file, skipping exact duplicates.
+
+    Appends rather than overwrites: after a swap, a previous run's orphans
+    exist nowhere but this file. Returns the total now in the file.
+    """
+    existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    merged = existing + [o for o in orphans if o not in existing]
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(merged, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, path)
+    return len(merged)
+
+
+def remove_db_files(db_path: Path) -> None:
+    """Delete a DB file plus any journal/WAL files SQLite left beside it."""
+    for suffix in ("", "-journal", "-wal", "-shm"):
+        db_path.with_name(db_path.name + suffix).unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
 # validation
 # ---------------------------------------------------------------------------
 def compare(label, merged, pairs, tol) -> int:
@@ -542,7 +633,7 @@ def validate(conn, batting_raw, pitching_raw) -> int:
         bad += missing
 
     counts = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-              for t in ("players", "batting_stats", "pitching_stats", "team_stats")}
+              for t in ("players", "batting_stats", "pitching_stats", "team_stats", "player_notes")}
     print("  " + ", ".join(f"{t}={n:,}" for t, n in counts.items()))
     fk = conn.execute("PRAGMA foreign_key_check").fetchall()
     if fk:
@@ -558,17 +649,16 @@ def missing_fangraphs_cache(cache_dir: Path) -> list[str]:
     return [n for n in names if not (cache_dir / n).exists()]
 
 
-def main() -> int:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--refresh", action="store_true", help="re-pull sources instead of using database/raw/ cache")
     ap.add_argument("--payroll", type=Path, default=None,
                     help=f"payroll CSV (default: {DEFAULT_PAYROLL}, skipped with a warning if absent)")
     ap.add_argument("--db", type=Path, default=DEFAULT_DB, help="output database (default: %(default)s)")
     ap.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE, help="raw pull cache (default: %(default)s)")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
-    # Check before connect(): the schema step drops every table, so failing
-    # here leaves an existing database untouched.
+    # Check before building anything, so a missing cache fails fast.
     if not args.refresh:
         missing = missing_fangraphs_cache(args.cache_dir)
         if missing:
@@ -578,29 +668,61 @@ def main() -> int:
                   file=sys.stderr)
             return 1
 
-    conn = connect(args.db)
+    # Build into <db>.tmp; the existing DB is only read (for its notes) until
+    # the final os.replace, so any failure before that leaves it untouched.
+    tmp_db = args.db.with_name(args.db.name + ".tmp")
+    step = "0/9 notes"
     try:
-        print("[1/8] schema");     run_sql_file(conn, SCHEMA_SQL)
-        print("[2/8] reference");  run_sql_file(conn, SEED_SQL)
-        print("[3/8] batting");    batting = load_stats(conn, "batting", args.cache_dir, args.refresh)
-        print("[4/8] pitching");   pitching = load_stats(conn, "pitching", args.cache_dir, args.refresh)
-        print("[5/8] identity");   load_chadwick(conn, args.cache_dir, args.refresh)
-        print("[6/8] payroll");    has_payroll = load_payroll(conn, args.payroll or DEFAULT_PAYROLL,
-                                                              required=args.payroll is not None)
-        print("[7/8] team results"); load_team_results(conn, args.cache_dir, args.refresh)
-        print("[8/8] validation"); bad = validate(conn, batting, pitching)
-    except LoadError as exc:
-        print(f"\nLOAD FAILED: {exc}", file=sys.stderr)
+        remove_db_files(tmp_db)                 # leftover from a crashed run
+        print(f"[{step}]"); notes, note_seq = read_notes(args.db)
+        print(f"  {len(notes):,} existing notes to carry over")
+        conn = connect(tmp_db)
+    except (OSError, sqlite3.Error) as exc:
+        print(f"\nLOAD FAILED at step [{step}]: {exc}\n{args.db} was not changed.", file=sys.stderr)
+        return 1
+
+    try:
+        step = "1/9 schema";       print(f"[{step}]"); run_sql_file(conn, SCHEMA_SQL)
+        step = "2/9 reference";    print(f"[{step}]"); run_sql_file(conn, SEED_SQL)
+        step = "3/9 batting";      print(f"[{step}]"); batting = load_stats(conn, "batting", args.cache_dir, args.refresh)
+        step = "4/9 pitching";     print(f"[{step}]"); pitching = load_stats(conn, "pitching", args.cache_dir, args.refresh)
+        step = "5/9 identity";     print(f"[{step}]"); load_chadwick(conn, args.cache_dir, args.refresh)
+        step = "6/9 payroll";      print(f"[{step}]"); has_payroll = load_payroll(conn, args.payroll or DEFAULT_PAYROLL,
+                                                                                required=args.payroll is not None)
+        step = "7/9 team results"; print(f"[{step}]"); load_team_results(conn, args.cache_dir, args.refresh)
+        step = "8/9 notes";        print(f"[{step}]"); orphans = restore_notes(conn, notes, note_seq)
+        step = "9/9 validation";   print(f"[{step}]"); bad = validate(conn, batting, pitching)
+    except (LoadError, sqlite3.Error) as exc:
+        print(f"\nLOAD FAILED at step [{step}]: {exc}\n"
+              f"{args.db} was not changed. Partial build left at {tmp_db}.", file=sys.stderr)
         return 1
     finally:
         conn.close()
 
     if bad:
-        print(f"\nVALIDATION FAILED: {bad} mismatched values -- treat this load as bad.", file=sys.stderr)
+        print(f"\nVALIDATION FAILED: {bad} mismatched values -- treat this load as bad.\n"
+              f"{args.db} was not changed. Rejected build left at {tmp_db}.", file=sys.stderr)
         return 1
+
+    # Orphans are saved before the swap: once the old DB is replaced, this
+    # file is the only copy. If writing it fails, the swap does not happen.
+    if orphans:
+        orphan_file = args.db.with_name(ORPHANS_NAME)
+        total = save_orphans(orphan_file, orphans)
+        print(f"\nWARNING: {len(orphans)} note(s) reference players no longer in the data and "
+              f"were not restored.\n  Saved to {orphan_file} ({total} total in the file).")
+
+    try:
+        os.replace(tmp_db, args.db)
+    except PermissionError:
+        print(f"\nLOAD FAILED at the final swap: {args.db} is open in another program "
+              f"(DB Browser for SQLite, a running app, ...).\n"
+              f"Close it and run the loader again. {args.db} was not changed; "
+              f"the new build is at {tmp_db}.", file=sys.stderr)
+        return 1
+
     print(f"\nOK: {args.db}" + ("" if has_payroll else " (without payroll: Q03, Q11 and payroll charts need it)"))
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
