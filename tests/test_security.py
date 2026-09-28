@@ -66,6 +66,23 @@ def test_500_is_friendly_and_logged(test_db_path, caplog):
     assert "secret internal detail" in caplog.text
 
 
+@pytest.mark.parametrize("url", ["/", "/charts", "/query", "/team/LAD", "/player/1", "/compare"])
+def test_missing_database_shows_setup_page_everywhere(tmp_path, url):
+    app = create_app({"TESTING": True, "DATABASE": tmp_path / "absent.db", "SECRET_KEY": "test-only-not-secret"})
+    resp = app.test_client().get(url)
+    assert resp.status_code == 503
+    assert "python scripts/load_data.py" in resp.get_data(as_text=True)
+    assert not (tmp_path / "absent.db").exists()
+
+
+def test_static_files_work_without_the_database(tmp_path):
+    app = create_app({"TESTING": True, "DATABASE": tmp_path / "absent.db", "SECRET_KEY": "test-only-not-secret"})
+    client = app.test_client()
+    assert client.get("/static/css/style.css").status_code == 200
+    assert client.get("/vendor/plotly.min.js").status_code == 200
+    assert client.get("/no/such/page").status_code == 404
+
+
 def test_missing_database_renders_setup_page(tmp_path):
     app = create_app({
         "TESTING": True,

@@ -159,9 +159,11 @@ def woba_leaderboard(result, season=None):
         marker={"color": PLAYER_STYLE["color"]},
         text=[f"{r['woba']:.3f}" for r in rows],
         textposition="outside",
-        customdata=[[r["woba_rank"], r["name"], r["team"], r["pa"], r["wrc_plus"]] for r in rows],
-        hovertemplate=("%{customdata[1]} (%{customdata[2]})<br>Rank %{customdata[0]}"
-                       "<br>wOBA %{x:.3f}<br>wRC+ %{customdata[4]}<br>PA %{customdata[3]}<extra></extra>"),
+        customdata=[[r["woba_rank"], r["name"], r["team"], r["pa"], r["wrc_plus"], r["player_id"]]
+                    for r in rows],
+        hovertemplate=("%{customdata[1]} (%{customdata[2]})<br>Player ID %{customdata[5]}"
+                       "<br>Rank %{customdata[0]}<br>wOBA %{x:.3f}<br>wRC+ %{customdata[4]}"
+                       "<br>PA %{customdata[3]}<extra></extra>"),
         name="wOBA",
     )
     fig = _styled(

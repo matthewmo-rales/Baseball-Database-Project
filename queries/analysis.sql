@@ -57,6 +57,7 @@
 --   RANK re-run: 110 rows, 10 per season, no ties in any season.
 WITH ranked AS (
     SELECT
+        b.player_id,
         b.season_year,
         p.full_name AS name,
         COALESCE(t.fangraphs_abbrev, '2+ teams') AS team,
@@ -73,7 +74,7 @@ WITH ranked AS (
     LEFT JOIN teams       AS t ON t.team_id     = b.team_id
     WHERE b.plate_appearances >= 3.1 * s.scheduled_games
 )
-SELECT season_year, woba_rank, name, team, pa,
+SELECT player_id, season_year, woba_rank, name, team, pa,
        ROUND(woba, 3) AS woba, wrc_plus
 FROM ranked
 WHERE woba_rank <= 10
@@ -92,6 +93,7 @@ ORDER BY season_year DESC, woba_rank;
 -- Verified: PASS. 2019 C rank 1 = J.T. Realmuto (5.9 WAR).
 WITH ranked AS (
     SELECT
+        p.player_id,
         p.primary_position AS pos,
         b.season_year,
         p.full_name AS name,
@@ -106,7 +108,7 @@ WITH ranked AS (
     WHERE p.primary_position IS NOT NULL
       AND p.primary_position NOT IN ('IF', 'P', 'DH')
 )
-SELECT season_year, pos, pos_rank, name, pa, ROUND(war, 1) AS war
+SELECT player_id, season_year, pos, pos_rank, name, pa, ROUND(war, 1) AS war
 FROM ranked
 WHERE pos_rank <= 5
 ORDER BY season_year DESC, pos, pos_rank;
@@ -163,6 +165,7 @@ ORDER BY season_year DESC, efficiency_rank;
 -- Verified: PASS. 2019 rank 1 = Gerrit Cole, 326 K, 13.82 K/9.
 WITH ranked AS (
     SELECT
+        p.player_id,
         ps.season_year,
         p.full_name AS name,
         ps.strikeouts,
@@ -178,7 +181,7 @@ WITH ranked AS (
     JOIN seasons        AS s ON s.season_year = ps.season_year
     WHERE ps.outs_recorded >= 150.0 * s.scheduled_games / 162
 )
-SELECT season_year, k_rank, name, strikeouts,
+SELECT player_id, season_year, k_rank, name, strikeouts,
        ROUND(ip, 1) AS ip, ROUND(k9, 2) AS k9, ROUND(war, 1) AS war
 FROM ranked
 WHERE k_rank <= 10
@@ -270,6 +273,7 @@ ranked AS (
     WHERE prev_season = season_year - 1
 )
 SELECT
+    r.player_id,
     CASE WHEN r.up_rk <= 15 THEN 'Riser' ELSE 'Faller' END AS direction,
     p.full_name AS name,
     r.prev_season,
@@ -297,6 +301,7 @@ ORDER BY r.delta DESC;
 --   partition is 16 players, so the >= 10 floor currently drops nothing.
 WITH elig AS (
     SELECT
+        p.player_id,
         b.season_year,
         p.primary_position AS pos,
         p.full_name AS name,
@@ -316,7 +321,7 @@ WITH elig AS (
       AND p.primary_position NOT IN ('IF', 'P', 'DH')
       AND b.plate_appearances >= 300.0 * s.scheduled_games / 162
 )
-SELECT season_year, pos, name, pa,
+SELECT player_id, season_year, pos, name, pa,
        ROUND(war, 1)       AS war,
        ROUND(100 * pct, 1) AS war_percentile,
        n_in_group
@@ -347,7 +352,7 @@ WITH running AS (
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
     )
 )
-SELECT p.full_name AS name, r.season_year AS season_reached,
+SELECT p.player_id, p.full_name AS name, r.season_year AS season_reached,
        r.cum_hits, r.cum_hr, r.cum_rbi
 FROM running AS r
 JOIN players AS p ON p.player_id = r.player_id
@@ -396,7 +401,7 @@ streaks AS (
     GROUP BY player_id, grp
     HAVING COUNT(*) >= 3
 )
-SELECT p.full_name AS name, st.streak_start, st.streak_end, st.seasons,
+SELECT p.player_id, p.full_name AS name, st.streak_start, st.streak_end, st.seasons,
        ROUND(st.streak_war, 1) AS streak_war
 FROM streaks AS st
 JOIN players AS p ON p.player_id = st.player_id
@@ -676,7 +681,7 @@ loo AS (
                / (COUNT(*) OVER (PARTITION BY player_id) - 1) AS other_avg
     FROM war
 )
-SELECT p.full_name AS name, l.season_year,
+SELECT p.player_id, p.full_name AS name, l.season_year,
        ROUND(l.war, 1)               AS war,
        ROUND(l.other_avg, 1)         AS avg_other_seasons,
        ROUND(l.war - l.other_avg, 1) AS delta,
@@ -950,14 +955,15 @@ ORDER BY bucket;
 --   (110 under ROW_NUMBER); the 11 extra are ties at #10: 2017 +1, 2018 +1,
 --   2020 +4 (six players tied at 16 HR for 7th), 2021 +2, 2023 +1, 2025 +2.
 WITH ranked AS (
-    SELECT season_year,
+    SELECT player_id,
+           season_year,
            full_name,
            team_id,
            home_runs,
            RANK() OVER (PARTITION BY season_year ORDER BY home_runs DESC) AS hr_rank
     FROM v_batting_season
 )
-SELECT season_year, hr_rank, full_name, team_id, home_runs
+SELECT player_id, season_year, hr_rank, full_name, team_id, home_runs
 FROM ranked
 WHERE hr_rank <= 10
 ORDER BY season_year DESC, hr_rank;

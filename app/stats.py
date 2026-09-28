@@ -273,8 +273,7 @@ HITTER_RANKED = (("woba", "wOBA"), ("wrc_plus", "wRC+"), ("war", "WAR"))
 PITCHER_RANKED = (("era_minus", "ERA-"), ("fip", "FIP"), ("war", "WAR"))
 
 
-def _ranks(db, sql, metrics, player_id, year):
-    row = db.execute(sql, (year, player_id)).fetchone()
+def _ranks(row, metrics):
     if row is None:
         return None
     return [
@@ -290,11 +289,11 @@ def _ranks(db, sql, metrics, player_id, year):
 
 def hitter_ranks(db, player_id, year):
     """None if the player wasn't a qualified hitter that season."""
-    return _ranks(db, HITTER_RANKS_SQL, HITTER_RANKED, player_id, year)
+    return _ranks(db.execute(HITTER_RANKS_SQL, (year, player_id)).fetchone(), HITTER_RANKED)
 
 
 def pitcher_ranks(db, player_id, year):
-    return _ranks(db, PITCHER_RANKS_SQL, PITCHER_RANKED, player_id, year)
+    return _ranks(db.execute(PITCHER_RANKS_SQL, (year, player_id)).fetchone(), PITCHER_RANKED)
 
 
 def qualified_hitter_seasons(db, player_id):
@@ -354,9 +353,12 @@ MIN_BASELINE_OTHERS = 5
 # (sum - own) / (n - 1), where "own" is the player's value if the player is
 # in the group that season. Every season in [first, last] gets a row (war162
 # NULL when hidden), so the chart leaves a gap instead of bridging it.
-# {qualified} is one of the two fixed CTE bodies below, never input.
-_BASELINE_SQL = "WITH " + COMBINED_WAR_CTE + """,
-qualified AS ({qualified}),
+# The SQL is three fixed pieces: head, one of the two qualified-group bodies
+# below, and tail. Plain concatenation of constants (tests/test_static_sql.py).
+_BASELINE_HEAD = "WITH " + COMBINED_WAR_CTE + """,
+qualified AS ("""
+
+_BASELINE_TAIL = """),
 grouped AS (
     SELECT q.season_year,
            SUM(w.war * 162.0 / s.scheduled_games)                      AS total,
@@ -380,22 +382,22 @@ SELECT se.season_year,
 """
 
 # Qualified hitters sharing a primary_position.
-HITTER_BASELINE_SQL = _BASELINE_SQL.replace("{qualified}", """
+HITTER_BASELINE_SQL = _BASELINE_HEAD + """
     SELECT b.player_id, b.season_year
       FROM batting_stats AS b
       JOIN seasons       AS s ON s.season_year = b.season_year
       JOIN players       AS p ON p.player_id   = b.player_id
      WHERE b.plate_appearances >= 3.1 * s.scheduled_games
-       AND p.primary_position = :position""")
+       AND p.primary_position = :position""" + _BASELINE_TAIL
 
 # Qualified pitchers listed at P (qualified by outs; WAR is still combined).
-PITCHER_BASELINE_SQL = _BASELINE_SQL.replace("{qualified}", """
+PITCHER_BASELINE_SQL = _BASELINE_HEAD + """
     SELECT x.player_id, x.season_year
       FROM pitching_stats AS x
       JOIN seasons        AS s ON s.season_year = x.season_year
       JOIN players        AS p ON p.player_id   = x.player_id
      WHERE x.outs_recorded >= 3 * s.scheduled_games
-       AND p.primary_position = 'P'""")
+       AND p.primary_position = 'P'""" + _BASELINE_TAIL
 
 
 def baseline_kind(position):

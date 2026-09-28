@@ -339,7 +339,7 @@ def execute(db, sql, params=()):
     """Run one registry SQL string with bound parameters. The only place
     saved-query SQL is executed; tests assert it only sees registry SQL."""
     start = time.perf_counter()
-    cur = db.execute(sql, params)
+    cur = db.execute(sql, params)   # static-sql-allow: registry SQL parsed from analysis.sql at startup
     rows = cur.fetchall()
     elapsed = (time.perf_counter() - start) * 1000
     columns = [d[0] for d in cur.description]

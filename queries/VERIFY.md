@@ -396,3 +396,5 @@ None. O1 (Q20 ties), O2 (Q16 C/OF curves), O3 (Q14 catchers) and O4 (human check
 | L6 Q16 interpretation | Caveat rewritten, smoothing added (decision 6); curve shape recorded as a finding (change 14) |
 
 2026-09-28: Q05 re-keyed from full_name to player_id (params CTE target_player_id = 13611, Mookie Betts; WHERE p.player_id = ...); Q18 gained p.player_id as its first output column. Re-verified: Q05 returns the same 11 rows with identical values and order; Q18 for Freeman 2023 returns the same 5 comps (Altuve 2022, Guerrero Jr. 2024, Cabrera 2016, Tucker 2021, Alvarez 2024) in the same order with the same distance_sq (0.264, 0.416, 0.593, 0.621, 0.627).
+
+2026-09-28: player_id added as the first output column of Q01, Q02, Q04, Q06, Q07, Q08, Q09, Q15 and Q20 (carried through the ranking CTE where the outer query selects from one); no other change. None of them groups, partitions or joins on full_name. Re-verified on the real DB: identical row counts (110, 330, 114, 30, 2542, 72, 116, 25, 121), identical values in every pre-existing column in the same order, and no NULL player_id.

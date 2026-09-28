@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Too large · Baseball Analytics{% endblock %}
+{% block content %}
+<h1>That was too much to send</h1>
+<p>The request was larger than this site accepts, so nothing was saved. Notes are limited to 2,000 characters; shorten the text and try again.</p>
+<p><a href="{{ url_for('main.index') }}">Back to player search</a></p>
+{% endblock %}

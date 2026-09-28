@@ -9,7 +9,7 @@ from that same Result; there is no chart SQL. Read-only connection only.
 from flask import Blueprint, abort, current_app, render_template, request
 
 from . import charts, queries, stats
-from .db import get_ro_db
+from .db import SQLITE_INT_MAX, get_ro_db
 from .main import MAX_QUERY_LEN, RESULT_LIMIT, search_players
 
 bp = Blueprint("queries", __name__)
@@ -18,6 +18,8 @@ bp = Blueprint("queries", __name__)
 NAME_COLUMNS = ("name", "full_name", "player")
 # Output column holding a team's FanGraphs abbreviation (Q01, Q03, Q11, ...).
 TEAM_ABBREV_COLUMN = "team"
+# What the season column means, where it isn't simply "the season".
+SEASON_FILTER_NOTES = {"Q06": "the later season of each pair"}
 
 
 def _saved():
@@ -31,17 +33,24 @@ def _query_or_404(slug):
     return query
 
 
-def positive_int_arg(name):
-    """None when the argument is absent or blank (the caller shows a picker);
-    400 when present but not a positive whole number."""
-    raw = request.args.get(name, "").strip()
-    if not raw:
-        return None
+def _int_or_none(raw):
+    """int(raw) if it is a whole number SQLite can bind, else None.
+    (int() also raises ValueError past Python's 4,300-digit limit.)"""
     try:
         value = int(raw)
     except ValueError:
-        abort(400, f"{name} must be a positive whole number.")
-    if value <= 0:
+        return None
+    return value if abs(value) <= SQLITE_INT_MAX else None
+
+
+def positive_int_arg(name):
+    """None when the argument is absent or blank (the caller shows a picker);
+    400 when present but not a positive whole number within SQLite's range."""
+    raw = request.args.get(name, "").strip()
+    if not raw:
+        return None
+    value = _int_or_none(raw)
+    if value is None or value <= 0:
         abort(400, f"{name} must be a positive whole number.")
     return value
 
@@ -51,9 +60,8 @@ def season_arg(db, name="season"):
     raw = request.args.get(name, "").strip()
     if not raw:
         return None
-    try:
-        season = int(raw)
-    except ValueError:
+    season = _int_or_none(raw)
+    if season is None:
         abort(400, f"{name} must be a season year.")
     if stats.get_season(db, season) is None:
         abort(400, f"{season} is not a season in this database.")
@@ -150,6 +158,8 @@ def show(slug):
         team_ids=_team_ids(db) if TEAM_ABBREV_COLUMN in result.columns else {},
         numeric=_numeric_columns(result),
         season_idx=queries.season_column(result.columns),
+        season_col_name=result.columns[queries.season_column(result.columns)] if has_season else None,
+        season_filter_note=SEASON_FILTER_NOTES.get(query.query_id),
     )
     if query.chart:
         ctx["chart_src_args"] = {"slug": slug, **({"season": season} if season else {})}

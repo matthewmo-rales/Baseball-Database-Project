@@ -87,7 +87,7 @@
   totals or averages of season values would be wrong. Best-season WAR is raw, not scaled for 2020.
 </p>
 
-<section class="chart-section">
+<section class="chart-section" id="war-chart">
   <h2>WAR per 162 games</h2>
   {{ chart(url_for('compare.war_chart', p1=p1, p2=p2),
            "Line chart comparing " ~ a.player.full_name ~ " and " ~ b.player.full_name ~ " by WAR per 162 games") }}

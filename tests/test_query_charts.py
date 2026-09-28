@@ -46,6 +46,8 @@ def test_woba_chart_defaults_to_latest_season_and_matches_q01(app, client, test_
     assert bar["x"] == [r["woba"] for r in rows]
     assert [c[0] for c in bar["customdata"]] == [r["woba_rank"] for r in rows]
     assert [c[2] for c in bar["customdata"]] == [r["team"] for r in rows]
+    assert [c[5] for c in bar["customdata"]] == [r["player_id"] for r in rows]
+    assert "Player ID %{customdata[5]}" in bar["hovertemplate"]
     assert f["layout"]["xaxis"]["title"]["text"] == "wOBA"
 
 
@@ -58,9 +60,9 @@ def test_woba_chart_for_a_chosen_season(app, client, test_db_path):
 
 
 def test_woba_bars_keep_duplicate_names_apart():
-    result = Q.Result(["season_year", "woba_rank", "name", "team", "pa", "woba", "wrc_plus"],
-                      [(2015, 1, "Same Name", "TSA", 600, .400, 150),
-                       (2015, 2, "Same Name", "TSB", 600, .390, 145)], 0)
+    result = Q.Result(["player_id", "season_year", "woba_rank", "name", "team", "pa", "woba", "wrc_plus"],
+                      [(1, 2015, 1, "Same Name", "TSA", 600, .400, 150),
+                       (2, 2015, 2, "Same Name", "TSB", 600, .390, 145)], 0)
     f = charts.woba_leaderboard(result).to_plotly_json()
     assert list(f["data"][0]["y"]) == [0, 1]
 
@@ -125,7 +127,7 @@ def test_age_curves_plot_q16_values(app, client, test_db_path):
 
 def test_age_curves_caption_points_to_caveats(client):
     text = re.sub(r"\s+", " ", client.get("/query/aging-curves").get_data(as_text=True))
-    section = text.split('<section class="chart-section">')[1].split("</section>")[0]
+    section = text.split('class="chart-section"')[1].split("</section>")[0]
     assert "delta method" in section and "survivorship bias" in section
     assert "2015&ndash;2025 window" in section
     assert "peak" not in section.lower()          # no peak-age claims in UI text
@@ -198,9 +200,10 @@ def test_chart_hooks_are_validated_at_startup():
 
 def test_filter_counts_and_notice(app, client, test_db_path):
     result = run(app, test_db_path, "Q01")
-    n = sum(1 for r in result.rows if r[0] == 2015)
+    n = sum(1 for r in result.records() if r["season_year"] == 2015)
     text = re.sub(r"\s+", " ", client.get("/query/top-woba-by-season?season=2015").get_data(as_text=True))
-    assert f"Filtered to 2015 after the query ran: {n} of {result.row_count} rows." in text
+    assert (f'Filtered to 2015 on <span class="mono">season_year</span> after the query ran: '
+            f"{n} of {result.row_count} rows.") in text
     assert f'result-count">{n} rows' in text
     table = text.split("<tbody>")[1].split("</tbody>")[0]
     assert table.count("<tr>") == n and "2016" not in table
@@ -242,7 +245,8 @@ def test_q18_season_is_its_target_not_a_filter(client):
 def test_filter_on_a_parameterized_query_keeps_the_player(client):
     body = client.get(f"/query/career-war-trajectory?player_id={HANK}&season=2016").get_data(as_text=True)
     assert f'<input type="hidden" name="player_id" value="{HANK}">' in body
-    assert "Filtered to 2016 after the query ran: 1 of 4 rows." in re.sub(r"\s+", " ", body)
+    assert ('Filtered to 2016 on <span class="mono">season_year</span> after the query ran: '
+            "1 of 4 rows.") in re.sub(r"\s+", " ", body)
 
 
 # ---------------------------------------------------------------- validation consistency
@@ -287,3 +291,22 @@ def test_csp_strict_on_chart_pages(client, url):
     assert "unsafe" not in resp.headers["Content-Security-Policy"]
     body = resp.get_data(as_text=True)
     assert "<script>" not in body and "style=" not in body
+
+
+def test_q06_filter_notice_names_the_later_season(client):
+    text = re.sub(r"\s+", " ", client.get("/query/war-risers-and-fallers?season=2016").get_data(as_text=True))
+    assert ('Filtered to 2016 on <span class="mono">season_year</span> (the later season of each pair) '
+            "after the query ran") in text
+
+
+@pytest.mark.parametrize("slug", ["top-woba-by-season", "top-war-by-position", "strikeout-leaders",
+                                  "war-risers-and-fallers", "war-percentile-by-position",
+                                  "cumulative-career-totals", "war-streaks", "breakout-seasons",
+                                  "top-hr-by-season"])
+def test_player_level_queries_link_names(app, client, slug):
+    query = app.extensions["saved_queries"][slug]
+    assert query.sql.count("player_id") >= 1
+    body = client.get(f"/query/{slug}").get_data(as_text=True)
+    table = body.split("<tbody>")[1] if "<tbody>" in body else ""
+    if table:                                   # some return no rows on the fixture
+        assert re.search(r'<a href="/player/9\d{5}">[^<]+</a>', table)

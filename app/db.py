@@ -41,6 +41,11 @@ _ACTION_NAMES = {
 }
 
 
+# SQLite INTEGER is 64-bit signed. sqlite3 raises OverflowError when a larger
+# Python int is bound, so request integers are capped at this before any query.
+SQLITE_INT_MAX = 2**63 - 1
+
+
 class DatabaseMissing(Exception):
     """database/baseball.db has not been built yet."""
 
@@ -106,5 +111,21 @@ def close_db(exc=None):
             conn.close()
 
 
+# Endpoints that work without the database: CSS/JS and the plotly bundle,
+# so the setup page itself renders styled.
+_NO_DB_ENDPOINTS = {"static", "charts.plotly_js", "charts.plotly_css", "charts.maplibre_css"}
+
+
+def require_database():
+    """Show the setup page on every page (including / with no search) until
+    database/baseball.db is built, not only on pages that happen to query."""
+    from flask import request
+    if request.endpoint in _NO_DB_ENDPOINTS or request.endpoint is None:
+        return
+    if not current_app.config["DATABASE"].is_file():
+        raise DatabaseMissing(str(current_app.config["DATABASE"]))
+
+
 def init_app(app):
+    app.before_request(require_database)
     app.teardown_appcontext(close_db)

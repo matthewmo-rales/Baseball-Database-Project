@@ -8,6 +8,7 @@ import secrets
 from pathlib import Path
 
 from flask import Flask, render_template
+from werkzeug.routing import IntegerConverter
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import CSRFError
 
@@ -29,11 +30,29 @@ CSP = (
 csrf = CSRFProtect()
 
 
+class SqliteIntConverter(IntegerConverter):
+    """<int:...> capped at SQLite's INTEGER max: a larger path id doesn't
+    match the route (404) instead of raising OverflowError when bound.
+    The digit limit also keeps int() from raising ValueError on very long
+    strings (Python's 4,300-digit cap), which Werkzeug doesn't catch."""
+
+    regex = r"\d{1,19}"
+
+    def __init__(self, url_map, *args, **kwargs):
+        kwargs.setdefault("max", db.SQLITE_INT_MAX)
+        super().__init__(url_map, *args, **kwargs)
+
+
 def create_app(test_config=None):
     app = Flask(__name__, instance_path=str(PROJECT_ROOT / "instance"))
+    # Before any blueprint registers its rules, so every <int:...> uses it.
+    app.url_map.converters["int"] = SqliteIntConverter
     app.config.from_mapping(
         DATABASE=PROJECT_ROOT / "database" / "baseball.db",
         SESSION_COOKIE_SAMESITE="Lax",
+        # The largest legitimate request is a note: 2,000 characters plus a
+        # CSRF token and a category. 16 KB leaves room for multi-byte text.
+        MAX_CONTENT_LENGTH=16 * 1024,
         # SESSION_COOKIE_SECURE stays False: local dev is plain http, and a
         # Secure cookie would never be sent back, breaking CSRF and flashes.
         # Set it to True in any deployment behind HTTPS. HttpOnly is Flask's
@@ -114,11 +133,22 @@ def _register_error_handlers(app):
         # keep Werkzeug's Allow header, swap in the friendly body
         return render_template("errors/405.html"), 405, {"Allow": ", ".join(e.valid_methods or [])}
 
+    @app.errorhandler(413)
+    def too_large(e):
+        return render_template("errors/413.html"), 413
+
     @app.errorhandler(500)
     def server_error(e):
         # Flask has already logged the traceback via app.log_exception before
         # this handler runs; the page itself never shows exception details.
         return render_template("errors/500.html"), 500
+
+    @app.errorhandler(OverflowError)
+    def integer_overflow(e):
+        # Backstop only: request integers are range-checked before binding
+        # (SqliteIntConverter, query_views._int_or_none). Logged so a gap shows up.
+        app.logger.warning("OverflowError reached the error handler: %s", e)
+        return render_template("errors/400.html"), 400
 
     @app.errorhandler(db.DatabaseMissing)
     def database_missing(e):

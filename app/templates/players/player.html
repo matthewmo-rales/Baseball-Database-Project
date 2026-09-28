@@ -11,7 +11,7 @@
 {% endif %}
 
 {% if has_war %}
-<section class="chart-section">
+<section class="chart-section" id="war-chart">
   <h2>WAR per 162 games</h2>
   {{ chart(url_for('players.war_chart', player_id=player.player_id),
            "Line chart of " ~ player.full_name ~ "'s WAR per 162 games by season") }}

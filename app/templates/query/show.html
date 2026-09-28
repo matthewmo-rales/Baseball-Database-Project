@@ -127,7 +127,7 @@
 {% endif %}
 
 {% if query.chart %}
-<section class="chart-section">
+<section class="chart-section" id="chart">
   {{ chart(url_for('queries.chart', **chart_src_args), query.title ~ " chart") }}
   {% if chart_default_season is defined %}
   <p class="caption">The chart shows {{ chart_default_season }}, the latest season; pick a season above to change it.</p>
@@ -139,7 +139,7 @@
 <section>
   <h2>Results</h2>
   {% if season is not none %}
-  <p class="notice">Filtered to {{ season }} after the query ran: {{ "{:,}".format(shown.row_count) }} of {{ "{:,}".format(result.row_count) }} rows.</p>
+  <p class="notice">Filtered to {{ season }} on <span class="mono">{{ season_col_name }}</span>{% if season_filter_note %} ({{ season_filter_note }}){% endif %} after the query ran: {{ "{:,}".format(shown.row_count) }} of {{ "{:,}".format(result.row_count) }} rows.</p>
   {% endif %}
   <p class="result-count">{{ "{:,}".format(shown.row_count) }} row{{ "s" if shown.row_count != 1 }} · {{ "%.1f"|format(result.elapsed_ms) }} ms</p>
   {% if shown.row_count > display_rows|length %}
