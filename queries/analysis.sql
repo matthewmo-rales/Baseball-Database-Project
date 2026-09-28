@@ -530,7 +530,7 @@ LIMIT 20;
 
 -- Q12b: Does Pythagorean luck persist into the next season?
 -- Business question: Should a team that out-won its run differential
---   expect to do it again? (Front offices bet on "no".)
+--   expect to do it again?
 -- Technique: LEAD() to pair each team-season with the next; bucketed
 --   comparison. Luck is expressed per 162 games so 2020 compares fairly.
 -- Caveats: Assumes team_id is stable across renames/relocations; check the
@@ -898,8 +898,8 @@ LIMIT 5;
 --   expect ERA to move toward FIP next year? (Buy-low / sell-high signal.)
 -- Technique: Self-join consecutive seasons; bucket by the ERA-FIP gap;
 --   compare mean absolute error of ERA vs FIP as predictors of next ERA.
--- Caveats: Min 100 IP (300 outs) both seasons, 2020 excluded. ERA is
---   computed inline as 27 * ER / outs.
+-- Caveats: Min 100 IP (300 outs) both seasons, 2020 excluded. ERA comes
+--   from the generated pitching_stats.era column (rounded to 2 dp).
 -- Verified: PASS. FIP beats ERA in all buckets; widest gaps in bucket 1
 --   (0.83 vs 1.16) and bucket 3 (0.77 vs 1.06).
 WITH sp AS (
