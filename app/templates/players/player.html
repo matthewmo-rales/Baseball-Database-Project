@@ -194,6 +194,17 @@
 </section>
 
 <section>
+  <h2>Saved queries</h2>
+  <ul class="query-links">
+    <li><a href="{{ url_for('queries.show', slug=trajectory_slug, player_id=player.player_id) }}">Q05 Career WAR trajectory</a> with a 3-year rolling average</li>
+    {% if qualified_seasons %}
+    <li><a href="{{ url_for('queries.show', slug=comps_slug, player_id=player.player_id) }}">Q18 Comparable hitters</a>
+      for a qualified season ({% for y in qualified_seasons %}<a href="{{ url_for('queries.show', slug=comps_slug, player_id=player.player_id, season=y) }}">{{ y }}</a>{% if not loop.last %}, {% endif %}{% endfor %})</li>
+    {% endif %}
+  </ul>
+</section>
+
+<section>
   <h2>Compare</h2>
   <form class="search" method="get" action="{{ url_for('compare.compare') }}">
     <input type="hidden" name="p1" value="{{ player.player_id }}">

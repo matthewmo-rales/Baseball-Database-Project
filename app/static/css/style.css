@@ -240,7 +240,23 @@ h3 { font-size: 1rem; margin: 1.25rem 0 0.5rem; }
 
 .notes-panel .note-body { margin-bottom: 0; }
 
+/* ---- navigation and saved queries ---- */
+.site-nav { display: flex; gap: 16px; margin-left: auto; font-size: 0.95rem; }
+.query-list { list-style: none; margin: 0; padding: 0; }
+.query-list li { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.query-question { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
+.query-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 1rem; }
+.query-meta dt { font-weight: 600; }
+.query-meta dd { margin: 0; }
+.panel h2 { margin-top: 0; }
+.season-choices { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; margin: 0; padding: 0; }
+.query-results td { white-space: nowrap; }
+.sql { font-size: 0.85rem; line-height: 1.4; }
+.bound ul { margin: 0 0 8px; padding-left: 20px; }
+
 @media (max-width: 560px) {
   .results th, .results td { padding: 6px; }
+  .query-meta { grid-template-columns: 1fr; }
+  .query-meta dd { margin-bottom: 6px; }
   .chart { min-height: 360px; }
 }

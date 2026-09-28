@@ -297,6 +297,26 @@ def pitcher_ranks(db, player_id, year):
     return _ranks(db, PITCHER_RANKS_SQL, PITCHER_RANKED, player_id, year)
 
 
+def qualified_hitter_seasons(db, player_id):
+    """Seasons in which the player was a qualified hitter (PA >= 3.1 x games)."""
+    return [r[0] for r in db.execute(
+        """SELECT b.season_year
+             FROM batting_stats AS b
+             JOIN seasons       AS s ON s.season_year = b.season_year
+            WHERE b.player_id = ?
+              AND b.plate_appearances >= 3.1 * s.scheduled_games
+            ORDER BY b.season_year""",
+        (player_id,),
+    ).fetchall()]
+
+
+def payroll_coverage(db):
+    """(team-seasons with payroll, all team-seasons)."""
+    return tuple(db.execute(
+        "SELECT COUNT(payroll_usd), COUNT(*) FROM team_stats"
+    ).fetchone())
+
+
 def min_pa(scheduled_games):
     """Smallest PA count that satisfies PA >= 3.1 * games (502.2 -> 503)."""
     return math.ceil(PA_PER_GAME * scheduled_games)

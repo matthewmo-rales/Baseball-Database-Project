@@ -87,8 +87,8 @@ def test_batting_totals_recompute_rates_from_components(client):
     assert total_cell(body, "obp") == ".344"
     # (506 + 93 + 2*6 + 3*71) / 1800 = 824 / 1800
     assert total_cell(body, "slg") == ".458"
-    assert "2015&ndash;2025 totals" in body and "career" not in body.lower()
     tfoot = body[body.index("<tfoot>"):body.index("</tfoot>")]
+    assert "2015&ndash;2025 totals" in tfoot and "career" not in tfoot.lower()
     assert ">495<" in tfoot and ">2,000<" in tfoot and ">11.0<" in tfoot   # G, PA, WAR
 
 

@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}{{ query.query_id }} {{ query.title }} · Baseball Analytics{% endblock %}
+{% block content %}
+<p class="breadcrumb"><a href="{{ url_for('queries.index') }}">&larr; All saved queries</a> · {{ query.tier }}</p>
+<h1><span class="mono">{{ query.query_id }}</span> {{ query.title }}{% if query.optional %} <span class="tag">optional</span>{% endif %}</h1>
+
+<dl class="query-meta">
+  <dt>Business question</dt><dd>{{ query.business_question }}</dd>
+  <dt>Technique</dt><dd>{{ query.technique }}</dd>
+  <dt>Caveats</dt><dd>{{ query.caveats }}</dd>
+  <dt>Verified</dt><dd>{{ query.verified }}</dd>
+</dl>
+
+{# ---------------------------------------------------------------- payroll #}
+{% if payroll %}
+  {% if payroll.loaded == 0 %}
+  <section class="notice panel" role="status">
+    <h2>Payroll data not loaded</h2>
+    <p>This query needs team payroll, which comes from an optional hand-built CSV that is not included in the
+      repository (see <code>database/README.md</code>). Without it every <code>payroll_usd</code> is empty, so the
+      query isn't run.</p>
+  </section>
+  {% elif payroll.loaded < payroll.total %}
+  <p class="notice">Payroll loaded for {{ payroll.loaded }} of {{ payroll.total }} team-seasons. Team-seasons without payroll are missing from these results.</p>
+  {% endif %}
+{% endif %}
+
+{# ---------------------------------------------------------------- player picker #}
+{% if picker is defined %}
+<section>
+  <h2>Choose a player</h2>
+  {% set example = query.example.target_player_id %}
+  <p class="hint">This query runs for one player, keyed on player ID because some names are shared.
+    Search below, or <a href="{{ url_for('queries.show', slug=query.slug, **query.example_args) }}">run the example</a>
+    (player ID {{ example }}{% if query.example.target_season %}, {{ query.example.target_season }}{% endif %}).</p>
+  <form class="search" method="get" action="{{ url_for('queries.show', slug=query.slug) }}" role="search">
+    <label for="q">Player name</label>
+    <input id="q" name="q" type="search" value="{{ picker.q }}" maxlength="{{ max_len }}"
+           placeholder="e.g. freddie freeman" autocomplete="off">
+    <button type="submit">Search</button>
+  </form>
+  {% if picker.message %}
+    <p class="notice">{{ picker.message }}</p>
+  {% elif picker.results is not none %}
+    {% if picker.results %}
+      <p class="result-count">
+        {% if picker.more -%}
+          Showing the first {{ limit }} matches for &ldquo;{{ picker.q }}&rdquo;. More players match, so refine your search if you don't see the one you want.
+        {%- else -%}
+          {{ picker.results|length }} match{{ "es" if picker.results|length != 1 }} for &ldquo;{{ picker.q }}&rdquo;.
+        {%- endif %}
+      </p>
+      <table class="results">
+        <thead>
+          <tr><th scope="col">Player</th><th scope="col" class="num">ID</th><th scope="col" class="num">Born</th><th scope="col">Pos</th><th scope="col">Seasons</th></tr>
+        </thead>
+        <tbody>
+          {% for r in picker.results %}
+          <tr>
+            <td><a href="{{ url_for('queries.show', slug=query.slug, player_id=r.player_id) }}">{{ r.full_name }}</a></td>
+            <td class="num">{{ r.player_id }}</td>
+            <td class="num">{{ r.birth_year if r.birth_year is not none else "—" }}</td>
+            <td>{{ r.primary_position or "—" }}</td>
+            <td>
+              {%- if r.first_season is none -%}—
+              {%- elif r.first_season == r.last_season -%}{{ r.first_season }}
+              {%- else -%}{{ r.first_season }}&ndash;{{ r.last_season }}
+              {%- endif -%}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="notice">No players match &ldquo;{{ picker.q }}&rdquo;.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+{% if player is defined %}
+<p class="player-meta">
+  Player: <a href="{{ url_for('players.player', player_id=player.player_id) }}">{{ player.full_name }}</a>
+  (ID <span class="mono">{{ player.player_id }}</span>{% if player.birth_year %}, born {{ player.birth_year }}{% endif %})
+  · <a href="{{ url_for('queries.show', slug=query.slug) }}">choose another player</a>
+</p>
+{% endif %}
+
+{# ---------------------------------------------------------------- season choice (Q18) #}
+{% if season_choices is defined %}
+<section>
+  {% if not_qualified is defined %}
+  <p class="notice">{{ player.full_name }} was not a qualified hitter in {{ not_qualified }}. Comps use qualified
+    hitter-seasons only (3.1 PA per scheduled game), so there is nothing to compare. Pick a season below.</p>
+  {% endif %}
+  <h2>Choose a season</h2>
+  {% if season_choices %}
+    <p class="hint">Seasons in which {{ player.full_name }} qualified (3.1 PA per scheduled game):</p>
+    <ul class="season-choices">
+      {% for y in season_choices %}
+      <li><a href="{{ url_for('queries.show', slug=query.slug, player_id=player.player_id, season=y) }}">{{ y }}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="notice">{{ player.full_name }} has no qualified hitter-seasons in 2015&ndash;2025, so this query has nothing to compare.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ---------------------------------------------------------------- results #}
+{% if result is defined %}
+<section>
+  <h2>Results</h2>
+  <p class="result-count">{{ "{:,}".format(result.row_count) }} row{{ "s" if result.row_count != 1 }} · {{ "%.1f"|format(result.elapsed_ms) }} ms</p>
+  {% if result.truncated %}
+  <p class="notice">Showing the first {{ "{:,}".format(max_rows) }} of {{ "{:,}".format(result.row_count) }} rows.</p>
+  {% endif %}
+  {% if result.rows %}
+  <div class="table-scroll">
+  <table class="results stats query-results">
+    <thead>
+      <tr>{% for c in result.columns %}<th scope="col"{% if loop.index0 in numeric %} class="num"{% endif %}>{{ c }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in result.rows %}
+      <tr>
+        {% for value in row %}
+        {% set link = links.get(loop.index0) %}
+        <td{% if loop.index0 in numeric %} class="num"{% endif %}>
+          {%- if value is none -%}—
+          {%- elif link and row[link[1]] is not none and link[0] == "player" -%}
+            <a href="{{ url_for('players.player', player_id=row[link[1]]) }}">{{ value }}</a>
+          {%- elif link and row[link[1]] is not none and link[0] == "team" -%}
+            {# /team/<id> arrives in chunk 5 #}
+            <a href="/team/{{ row[link[1]]|urlencode }}">{{ value }}</a>
+          {%- else -%}{{ value }}
+          {%- endif -%}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="notice">The query returned no rows.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ---------------------------------------------------------------- SQL #}
+<section class="sql-section">
+  <h2>{% if result is defined %}SQL executed{% else %}SQL{% endif %}</h2>
+  {% if query.params %}
+  <div class="bound">
+    <h3>Bound values</h3>
+    {% if bound is defined %}
+    <ul>{% for name, value in bound %}<li><span class="mono">{{ name }}</span> = <span class="mono">{{ value }}</span></li>{% endfor %}</ul>
+    {% else %}
+    <p class="hint">None yet: choose {% if query.params|length > 1 %}a player and a season{% else %}a player{% endif %}.
+      Each <span class="mono">?</span> is bound in order: {% for p in query.params %}<span class="mono">{{ p.name }}</span>{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+  <pre class="sql"><code>{{ query.sql }}</code></pre>
+</section>
+{% endblock %}

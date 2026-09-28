@@ -11,7 +11,7 @@ from flask import Flask, render_template
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import CSRFError
 
-from . import charts, db, formatting
+from . import charts, db, formatting, queries
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -50,13 +50,15 @@ def create_app(test_config=None):
     db.init_app(app)
     formatting.init_app(app)
     charts.init_app(app)
+    queries.init_app(app)     # parses queries/analysis.sql; raises on any mismatch
 
-    from . import compare, main, notes, players
+    from . import compare, main, notes, players, query_views
     app.register_blueprint(main.bp)
     app.register_blueprint(notes.bp)
     app.register_blueprint(players.bp)
     app.register_blueprint(compare.bp)
     app.register_blueprint(charts.bp)
+    app.register_blueprint(query_views.bp)
 
     _register_security_headers(app)
     _register_error_handlers(app)

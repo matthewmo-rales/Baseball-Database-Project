@@ -147,6 +147,21 @@ STAT_PITCHING = [
 ]
 
 
+# Fictional team-seasons with payroll, so Q03 and Q11 have data (8 rows).
+TEAM_STATS_COLS = ("team_id, season_year, games_played, wins, losses, runs_scored, runs_allowed,"
+                   " payroll_usd")
+TEAM_STATS = [
+    ("TSA", 2015, 162, 90, 72, 750, 650, 150_000_000),
+    ("TSB", 2015, 162, 72, 90, 650, 750, 90_000_000),
+    ("TSA", 2016, 162, 85, 77, 720, 680, 160_000_000),
+    ("TSB", 2016, 162, 77, 85, 680, 720, 95_000_000),
+    ("TSA", 2017, 162, 80, 82, 700, 700, 170_000_000),
+    ("TSB", 2017, 162, 82, 80, 700, 700, 100_000_000),
+    ("TSA", 2020, 60, 35, 25, 280, 240, 60_000_000),
+    ("TSB", 2020, 60, 25, 35, 240, 280, 40_000_000),
+]
+
+
 def _insert(conn, table, cols, rows):
     marks = ", ".join("?" * len(rows[0]))
     conn.executemany(f"INSERT INTO {table} ({cols}) VALUES ({marks})", rows)
@@ -181,6 +196,7 @@ def build_test_db(path):
                 STAT_PLAYERS)
         _insert(conn, "batting_stats", BATTING_COLS, STAT_BATTING)
         _insert(conn, "pitching_stats", PITCHING_COLS, STAT_PITCHING)
+        _insert(conn, "team_stats", TEAM_STATS_COLS, TEAM_STATS)
         conn.commit()
     finally:
         conn.close()

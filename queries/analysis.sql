@@ -32,9 +32,9 @@
 --   * Queries sensitive to single-season noise (Q06, Q15, Q17, Q19)
 --     exclude 2020 entirely, because scaling 60 games x2.7 amplifies noise.
 --
--- Queries with a params CTE: Q05 takes a name (duplicate names return one
--- block per player_id); Q18 takes a player_id. In Flask, the params CTE
--- becomes a bound ? parameter.
+-- Queries with a params CTE: Q05 takes a player_id; Q18 takes a player_id
+-- and a season. Both are keyed on player_id because full_name is not
+-- unique. In Flask, each params CTE value becomes a bound ? parameter.
 --
 -- To run one query in DB Browser: highlight it, then Ctrl+Return.
 -- ============================================================================
@@ -194,11 +194,12 @@ ORDER BY season_year DESC, k_rank;
 -- Technique: UNION ALL (batting + pitching WAR, so two-way players are
 --   whole); AVG OVER a ROWS frame; LAG.
 -- Caveats: WAR scaled to 162 games for 2020. The ROWS frame counts rows,
---   not years, so a skipped season still sits "adjacent". Duplicate names
---   return one block per player_id. Pre-2015 seasons are missing.
+--   not years, so a skipped season still sits "adjacent". Keyed on
+--   player_id because 19 full names are shared by two players each.
+--   Pre-2015 seasons are missing.
 -- Verified: PASS. Betts 2015-2025 matches FanGraphs within 0.3 every season.
 --   Stored WAR 2015–2025: 4.8, 7.4, 4.6, 10.2, 5.8, 2.7, 3.9, 6.0, 7.6, 4.3, 3.4.
-WITH params AS (SELECT 'Mookie Betts' AS target),
+WITH params AS (SELECT 13611 AS target_player_id),   -- Mookie Betts
 war AS (
     SELECT player_id, season_year, SUM(war) AS war
     FROM (
@@ -230,7 +231,7 @@ SELECT
     ), 1)               AS change_vs_prev
 FROM scaled  AS sc
 JOIN players AS p ON p.player_id = sc.player_id
-WHERE p.full_name = (SELECT target FROM params)
+WHERE p.player_id = (SELECT target_player_id FROM params)
 ORDER BY p.player_id, sc.season_year;
 
 
@@ -872,6 +873,7 @@ target AS (
       AND r.season_year = (SELECT target_season    FROM params)
 )
 SELECT
+    p.player_id,
     p.full_name AS name,
     r.season_year,
     ROUND(100 * r.k_pct, 1)  AS k_pct,

@@ -3,9 +3,9 @@
 All reads use get_ro_db(). Nothing here writes; notes are managed on
 /player/<id>/notes (blueprint "notes").
 """
-from flask import Blueprint, abort, g, render_template
+from flask import Blueprint, abort, current_app, g, render_template
 
-from . import charts, stats
+from . import charts, queries, stats
 from .db import get_ro_db
 
 bp = Blueprint("players", __name__)
@@ -43,6 +43,9 @@ def player(player_id):
         notes=notes,
         has_war=has_war,
         baseline_kind=stats.baseline_kind(p["primary_position"]),
+        qualified_seasons=stats.qualified_hitter_seasons(db, player_id),
+        trajectory_slug=queries.slug_for(current_app.extensions["saved_queries"], "Q05"),
+        comps_slug=queries.slug_for(current_app.extensions["saved_queries"], "Q18"),
     )
 
 

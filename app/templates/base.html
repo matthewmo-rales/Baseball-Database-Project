@@ -11,6 +11,10 @@
   <header class="site-header">
     <a class="brand" href="{{ url_for('main.index') }}">Baseball Analytics</a>
     <span class="tagline">MLB seasons 2015&ndash;2025</span>
+    <nav class="site-nav" aria-label="Main">
+      <a href="{{ url_for('main.index') }}">Player search</a>
+      <a href="{{ url_for('queries.index') }}">Saved queries</a>
+    </nav>
   </header>
   <main class="content">
     {% with messages = get_flashed_messages() %}

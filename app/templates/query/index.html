@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Saved queries · Baseball Analytics{% endblock %}
+{% block content %}
+<h1>Saved queries</h1>
+<p class="hint">The analysis queries from <code>queries/analysis.sql</code>, run against the 2015&ndash;2025 data.
+  Each page shows the question it answers, its caveats, and the exact SQL executed.</p>
+
+{% for tier, items in groups %}
+<section>
+  <h2>{{ tier }}</h2>
+  <ul class="query-list">
+    {% for q in items %}
+    <li>
+      <a href="{{ url_for('queries.show', slug=q.slug) }}"><span class="mono">{{ q.query_id }}</span> {{ q.title }}</a>
+      {%- if q.optional %} <span class="tag">optional</span>{% endif %}
+      {%- if q.params %} <span class="tag">choose a player</span>{% endif %}
+      <p class="query-question">{{ q.business_question }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+{% endblock %}

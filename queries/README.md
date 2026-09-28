@@ -50,7 +50,7 @@ Every number below comes from VERIFY.md or from the query it names. Definitions 
 - **Business question:** Is a given player trending up, at his peak, or declining?
 - **Technique:** `UNION ALL` of batting and pitching WAR so two-way players are complete; `AVG() OVER (ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)`; `LAG()`.
 - **Key finding:** Example target Mookie Betts: stored WAR 2015–2025 is 4.8, 7.4, 4.6, 10.2, 5.8, 2.7, 3.9, 6.0, 7.6, 4.3, 3.4, each within 0.3 of FanGraphs. (Q05)
-- **Main caveat:** The rolling frame counts rows, not years, so a skipped season still sits "adjacent". Seasons before 2015 are missing. The target is a name; duplicate names return one block per `player_id`.
+- **Main caveat:** The rolling frame counts rows, not years, so a skipped season still sits "adjacent". Seasons before 2015 are missing. The target is a `player_id`, because 19 full names are shared by two players each.
 
 ### Q06: Biggest year-over-year WAR risers and fallers
 
@@ -192,7 +192,7 @@ Build the database first if it isn't there; see [database/README.md](../database
 2. Open `queries/analysis.sql` in the Execute SQL tab.
 3. Highlight one query (from its `-- Q##:` header to its closing semicolon) and press Ctrl+Return. With a selection, DB Browser runs only the selected text. With nothing selected it runs the whole file and shows only the last result.
 
-Q05 and Q18 take a target in a `params` CTE at the top of the query: a name for Q05, a `player_id` and season for Q18. Edit the values there. To look up a `player_id`:
+Q05 and Q18 take a target in a `params` CTE at the top of the query: a `player_id` for Q05, a `player_id` and season for Q18. Edit the values there. To look up a `player_id`:
 
 ```sql
 SELECT player_id, full_name, birth_date FROM players WHERE full_name LIKE '%Freeman%';
