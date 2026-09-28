@@ -7,7 +7,7 @@
 
 {% macro team(row) -%}
 {%- if row.is_multi_team -%}Multiple teams
-{%- elif row.team_id -%}<a href="/team/{{ row.team_id|urlencode }}">{{ row.fangraphs_abbrev or row.team_id }}</a>
+{%- elif row.team_id -%}<a href="{{ url_for('teams.team', team_id=row.team_id, season=row.season_year) }}">{{ row.fangraphs_abbrev or row.team_id }}</a>
 {%- else -%}—{%- endif -%}
 {%- endmacro %}
 

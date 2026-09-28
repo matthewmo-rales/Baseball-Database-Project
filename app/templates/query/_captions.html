@@ -1,0 +1,22 @@
+{# Captions for the saved-query charts, shared by the query pages and /charts.
+   Keyed by the registry's chart name. No cause claims, no peak-age claims. #}
+{% macro chart_caption(name) -%}
+{% if name == "woba_leaderboard" %}
+<p class="caption">Q01's rows for one season: qualified hitters (3.1 PA per scheduled game), ranked by wOBA.
+  Tied players share a rank. Hover for team, rank, wRC+ and PA.</p>
+{% elif name == "payroll_vs_win_pct" %}
+<p class="caption">Each point is one team-season from Q03. Payroll is shown relative to that season's league
+  average because payroll levels change from year to year. 2020 is drawn hollow: it was a 60-game season and
+  its payroll is prorated in the source.</p>
+{% elif name == "age_curves" %}
+<p class="caption">Markers: Q16's raw average change in wRC+ into each age, from paired consecutive seasons of the
+  same player (the delta method). Lines: Q16's 3-age smoothed change. Read Q16's caveats before drawing
+  conclusions: survivorship bias and the 2015&ndash;2025 window both shape these curves. Hover shows the number of
+  player pairs behind each point.</p>
+{% elif name == "birth_cohorts" %}
+<p class="notice"><strong>The 2015&ndash;2025 window truncates careers: older cohorts are missing early seasons,
+  younger cohorts later ones.</strong></p>
+<p class="caption">Q10's cohorts by birth year (not draft class). Hover shows WAR per player, the number of
+  players, and which ages each cohort covers in the data.</p>
+{% endif %}
+{%- endmacro %}

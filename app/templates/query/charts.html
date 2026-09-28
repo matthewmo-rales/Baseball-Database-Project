@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_charts.html" import chart, chart_head, chart_scripts %}
+{% from "query/_captions.html" import chart_caption %}
+{% block title %}Charts · Baseball Analytics{% endblock %}
+{% block head %}{{ chart_head() }}{% endblock %}
+{% block content %}
+<h1>Charts</h1>
+<p class="hint">Each chart is drawn from a saved query's own output. Open the query for its full results,
+  caveats, the SQL that ran, and a season filter where one applies.</p>
+
+{% for q in items %}
+<section class="chart-section">
+  <h2><a href="{{ url_for('queries.show', slug=q.slug) }}"><span class="mono">{{ q.query_id }}</span> {{ q.title }}</a></h2>
+  {% if q.requires_payroll and not payroll_loaded %}
+  <div class="notice panel" role="status">
+    <p><strong>Payroll data not loaded.</strong> This chart needs team payroll, which comes from an optional
+      hand-built CSV that is not included in the repository (see <code>database/README.md</code>).</p>
+  </div>
+  {% else %}
+  {{ chart(url_for('queries.chart', slug=q.slug), q.title ~ " chart") }}
+  {% if q.chart == "woba_leaderboard" %}<p class="caption">Latest season shown; the query page has a season selector.</p>{% endif %}
+  {{ chart_caption(q.chart) }}
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}
+{% block scripts %}{{ chart_scripts() }}{% endblock %}

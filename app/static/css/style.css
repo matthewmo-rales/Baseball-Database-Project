@@ -87,6 +87,14 @@ h1 { font-size: 1.6rem; margin: 0.5rem 0 1rem; }
   cursor: pointer;
 }
 .search button:hover { background: #174a7c; }
+.search select {
+  padding: 7px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
 
 .notice {
   padding: 10px 12px;

@@ -419,3 +419,60 @@ def baseline_series(db, player_id, position, first_season, last_season):
     if kind == "hitter":
         return db.execute(HITTER_BASELINE_SQL, {**params, "position": position}).fetchall()
     return db.execute(PITCHER_BASELINE_SQL, params).fetchall()
+
+
+# ---------------------------------------------------------------- team page
+
+def get_team(db, team_id):
+    return db.execute(
+        """SELECT t.team_id, t.team_name, t.city, t.fangraphs_abbrev, t.first_season,
+                  t.last_season, d.division_name, d.league
+             FROM teams     AS t
+             JOIN divisions AS d ON d.division_id = t.division_id
+            WHERE t.team_id = ?""",
+        (team_id,),
+    ).fetchone()
+
+
+def team_seasons(db, team_id):
+    """One row per season. win_pct, run_differential and pythag_win_pct are
+    the generated (rounded) columns: display only. Payroll is compared with
+    that season's league average; NULL when payroll isn't loaded."""
+    return db.execute(
+        """SELECT ts.season_year, ts.wins, ts.losses, ts.win_pct,
+                  ts.runs_scored, ts.runs_allowed, ts.run_differential, ts.pythag_win_pct,
+                  ts.payroll_usd / 1e6 AS payroll_millions,
+                  ts.payroll_usd / (SELECT AVG(x.payroll_usd) FROM team_stats AS x
+                                     WHERE x.season_year = ts.season_year) AS payroll_vs_avg,
+                  s.is_shortened, s.scheduled_games
+             FROM team_stats AS ts
+             JOIN seasons    AS s ON s.season_year = ts.season_year
+            WHERE ts.team_id = ?
+            ORDER BY ts.season_year""",
+        (team_id,),
+    ).fetchall()
+
+
+def roster_hitters(db, team_id, season):
+    """Single-team batting rows only: a multi-team season is one combined row
+    with team_id NULL, so it can't be split across teams."""
+    return db.execute(
+        """SELECT player_id, full_name, plate_appearances, home_runs, batting_avg, obp, slg,
+                  woba, wrc_plus, war
+             FROM v_batting_season
+            WHERE team_id = ? AND season_year = ? AND is_multi_team = 0
+            ORDER BY war DESC, full_name""",
+        (team_id, season),
+    ).fetchall()
+
+
+def roster_pitchers(db, team_id, season):
+    return db.execute(
+        """SELECT p.player_id, pl.full_name, p.games, p.games_started, p.ip_display,
+                  p.era, p.fip, p.era_minus, p.war
+             FROM pitching_stats AS p
+             JOIN players        AS pl ON pl.player_id = p.player_id
+            WHERE p.team_id = ? AND p.season_year = ? AND p.is_multi_team = 0
+            ORDER BY p.war DESC, pl.full_name""",
+        (team_id, season),
+    ).fetchall()

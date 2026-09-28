@@ -1,10 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Compare {{ player.full_name }} · Baseball Analytics{% endblock %}
+{% block title %}Compare{% if player %} {{ player.full_name }}{% endif %} · Baseball Analytics{% endblock %}
 {% block content %}
+{% if player %}
 <h1>Compare {{ player.full_name }} <span class="count mono">({{ player.player_id }})</span> with&hellip;</h1>
+{% else %}
+<h1>Compare two players</h1>
+{% endif %}
 <form class="search" method="get" action="{{ url_for('compare.compare') }}" role="search">
-  <input type="hidden" name="p1" value="{{ player.player_id }}">
-  <label for="q">Second player's name</label>
+  {% if player %}<input type="hidden" name="p1" value="{{ player.player_id }}">{% endif %}
+  {% if other_id %}<input type="hidden" name="p2" value="{{ other_id }}">{% endif %}
+  <label for="q">{% if player %}Second player's name{% else %}First player's name{% endif %}</label>
   <input id="q" name="q" type="search" value="{{ search.q }}" maxlength="{{ max_len }}"
          placeholder="e.g. aaron judge" autocomplete="off" autofocus>
   <button type="submit">Search</button>
@@ -34,7 +39,7 @@
       <tbody>
         {% for r in search.results %}
         <tr>
-          <td><a href="{{ url_for('compare.compare', p1=player.player_id, p2=r.player_id) }}">{{ r.full_name }}</a></td>
+          <td><a href="{{ url_for('compare.compare', p1=player.player_id, p2=r.player_id) if player else url_for('compare.compare', p1=r.player_id, p2=other_id) }}">{{ r.full_name }}</a></td>
           <td class="num">{{ r.player_id }}</td>
           <td class="num">{{ r.birth_year if r.birth_year is not none else "—" }}</td>
           <td>{{ r.primary_position or "—" }}</td>
@@ -52,5 +57,5 @@
     <p class="notice">No other players match &ldquo;{{ search.q }}&rdquo;.</p>
   {% endif %}
 {% endif %}
-<p><a href="{{ url_for('players.player', player_id=player.player_id) }}">&larr; Back to {{ player.full_name }}</a></p>
+{% if player %}<p><a href="{{ url_for('players.player', player_id=player.player_id) }}">&larr; Back to {{ player.full_name }}</a></p>{% endif %}
 {% endblock %}

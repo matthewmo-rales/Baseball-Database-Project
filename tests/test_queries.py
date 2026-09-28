@@ -214,7 +214,7 @@ def test_sql_pre_is_escaped(client):
 
 def test_team_id_column_links_to_team_page(client):
     body = get(client, "/query/top-hr-by-season")
-    assert 'href="/team/TSA">TSA</a>' in body
+    assert re.search(r'href="/team/TSA\?season=\d{4}">TSA</a>', body)
 
 
 # Q05 ---------------------------------------------------------------------
@@ -226,9 +226,8 @@ def test_q05_without_player_shows_picker_and_example(client):
     assert "SQL executed" not in body
 
 
-@pytest.mark.parametrize("player_id", ["0", "-5", ""])
-def test_q05_non_positive_or_blank_player_shows_picker(client, player_id):
-    body = get(client, f"/query/career-war-trajectory?player_id={player_id}")
+def test_q05_blank_player_shows_picker(client):
+    body = get(client, "/query/career-war-trajectory?player_id=")
     assert "Choose a player" in body and "SQL executed" not in body
 
 
@@ -237,10 +236,10 @@ def test_q05_picker_searches_and_links_by_id(client):
     assert f'href="/query/career-war-trajectory?player_id={HANK}">Hank Baseline</a>' in body
 
 
-@pytest.mark.parametrize("player_id", ["abc", "1.5", "13611;DROP"])
-def test_q05_non_integer_player_is_400(client, player_id):
+@pytest.mark.parametrize("player_id", ["abc", "1.5", "13611;DROP", "0", "-5"])
+def test_q05_invalid_player_is_400(client, player_id):
     body = get(client, f"/query/career-war-trajectory?player_id={player_id}", 400)
-    assert "player_id must be a whole number." in body
+    assert "player_id must be a positive whole number." in body
 
 
 def test_q05_unknown_player_is_404(client):

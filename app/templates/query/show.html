@@ -1,5 +1,8 @@
 {% extends "base.html" %}
+{% from "_charts.html" import chart, chart_head, chart_scripts %}
+{% from "query/_captions.html" import chart_caption %}
 {% block title %}{{ query.query_id }} {{ query.title }} · Baseball Analytics{% endblock %}
+{% block head %}{% if query.chart and result is defined %}{{ chart_head() }}{% endif %}{% endblock %}
 {% block content %}
 <p class="breadcrumb"><a href="{{ url_for('queries.index') }}">&larr; All saved queries</a> · {{ query.tier }}</p>
 <h1><span class="mono">{{ query.query_id }}</span> {{ query.title }}{% if query.optional %} <span class="tag">optional</span>{% endif %}</h1>
@@ -109,30 +112,59 @@
 
 {# ---------------------------------------------------------------- results #}
 {% if result is defined %}
+{% if season_filter %}
+<form class="search filter" method="get" action="{{ url_for('queries.show', slug=query.slug) }}">
+  {% if player is defined %}<input type="hidden" name="player_id" value="{{ player.player_id }}">{% endif %}
+  <label for="season">Season</label>
+  <select id="season" name="season">
+    <option value=""{% if season is none %} selected{% endif %}>All seasons</option>
+    {% for y in seasons %}
+    <option value="{{ y }}"{% if season == y %} selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Filter</button>
+</form>
+{% endif %}
+
+{% if query.chart %}
+<section class="chart-section">
+  {{ chart(url_for('queries.chart', **chart_src_args), query.title ~ " chart") }}
+  {% if chart_default_season is defined %}
+  <p class="caption">The chart shows {{ chart_default_season }}, the latest season; pick a season above to change it.</p>
+  {% endif %}
+  {{ chart_caption(query.chart) }}
+</section>
+{% endif %}
+
 <section>
   <h2>Results</h2>
-  <p class="result-count">{{ "{:,}".format(result.row_count) }} row{{ "s" if result.row_count != 1 }} · {{ "%.1f"|format(result.elapsed_ms) }} ms</p>
-  {% if result.truncated %}
-  <p class="notice">Showing the first {{ "{:,}".format(max_rows) }} of {{ "{:,}".format(result.row_count) }} rows.</p>
+  {% if season is not none %}
+  <p class="notice">Filtered to {{ season }} after the query ran: {{ "{:,}".format(shown.row_count) }} of {{ "{:,}".format(result.row_count) }} rows.</p>
   {% endif %}
-  {% if result.rows %}
+  <p class="result-count">{{ "{:,}".format(shown.row_count) }} row{{ "s" if shown.row_count != 1 }} · {{ "%.1f"|format(result.elapsed_ms) }} ms</p>
+  {% if shown.row_count > display_rows|length %}
+  <p class="notice">Showing the first {{ "{:,}".format(max_rows) }} of {{ "{:,}".format(shown.row_count) }} rows.</p>
+  {% endif %}
+  {% if display_rows %}
   <div class="table-scroll">
   <table class="results stats query-results">
     <thead>
       <tr>{% for c in result.columns %}<th scope="col"{% if loop.index0 in numeric %} class="num"{% endif %}>{{ c }}</th>{% endfor %}</tr>
     </thead>
     <tbody>
-      {% for row in result.rows %}
+      {% for row in display_rows %}
       <tr>
         {% for value in row %}
         {% set link = links.get(loop.index0) %}
+        {% set link_id = row[link[1]] if link else none %}
         <td{% if loop.index0 in numeric %} class="num"{% endif %}>
           {%- if value is none -%}—
-          {%- elif link and row[link[1]] is not none and link[0] == "player" -%}
-            <a href="{{ url_for('players.player', player_id=row[link[1]]) }}">{{ value }}</a>
-          {%- elif link and row[link[1]] is not none and link[0] == "team" -%}
-            {# /team/<id> arrives in chunk 5 #}
-            <a href="/team/{{ row[link[1]]|urlencode }}">{{ value }}</a>
+          {%- elif link and link_id is not none and link[0] == "player" -%}
+            <a href="{{ url_for('players.player', player_id=link_id) }}">{{ value }}</a>
+          {%- elif link and link_id is not none and link[0] == "team" -%}
+            <a href="{{ url_for('teams.team', team_id=link_id, season=row[season_idx] if season_idx is not none else none) }}">{{ value }}</a>
+          {%- elif link and link[0] == "team_abbrev" and team_ids.get(value) -%}
+            <a href="{{ url_for('teams.team', team_id=team_ids[value], season=row[season_idx] if season_idx is not none else none) }}">{{ value }}</a>
           {%- else -%}{{ value }}
           {%- endif -%}
         </td>
@@ -143,7 +175,7 @@
   </table>
   </div>
   {% else %}
-  <p class="notice">The query returned no rows.</p>
+  <p class="notice">{% if season is not none %}No rows for {{ season }}.{% else %}The query returned no rows.{% endif %}</p>
   {% endif %}
 </section>
 {% endif %}
@@ -165,3 +197,4 @@
   <pre class="sql"><code>{{ query.sql }}</code></pre>
 </section>
 {% endblock %}
+{% block scripts %}{% if query.chart and result is defined %}{{ chart_scripts() }}{% endif %}{% endblock %}

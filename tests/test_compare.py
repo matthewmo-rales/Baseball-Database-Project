@@ -11,26 +11,45 @@ def get(client, query):
     return resp.status_code, resp.get_data(as_text=True)
 
 
-@pytest.mark.parametrize("query", [
-    {},                               # p1 missing
-    {"p1": "abc"},                    # non-integer
-    {"p1": "1.5"},
-    {"p1": "0"},                      # non-positive
-    {"p1": "-3"},
-    {"q": "hank"},                    # q without p1
-])
-def test_bad_p1_is_400(client, query):
+# Same rule as the saved queries: missing -> picker, present but invalid -> 400.
+
+@pytest.mark.parametrize("query", [{}, {"p1": ""}, {"q": "zz"}])
+def test_missing_p1_shows_first_player_picker(client, query):
     status, body = get(client, query)
+    assert status == 200
+    assert "Compare two players" in body and "First player's name" in body
+
+
+def test_first_player_picker_links_to_second_step(client):
+    _, body = get(client, {"q": "hank"})
+    assert f'href="/compare?p1={HANK}"' in body
+
+
+def test_first_player_picker_keeps_p2_and_excludes_it(client):
+    _, body = get(client, {"p2": HANK, "q": "armstrong"})
+    assert f'<input type="hidden" name="p2" value="{HANK}">' in body
+    assert re.findall(r'href="/compare\?p1=(\d+)&amp;p2=(\d+)"', body)
+    assert f'p1={HANK}&amp;' not in body
+
+
+@pytest.mark.parametrize("p1", ["abc", "1.5", "0", "-3", "1;DROP"])
+def test_invalid_p1_is_400(client, p1):
+    status, body = get(client, {"p1": p1})
     assert status == 400
-    assert "p1 must be a positive player ID" in body
+    assert "p1 must be a positive whole number." in body
     assert "Traceback" not in body
 
 
-@pytest.mark.parametrize("p2", ["abc", "0", "-1", ""])
-def test_bad_p2_is_400(client, p2):
+@pytest.mark.parametrize("p2", ["abc", "0", "-1"])
+def test_invalid_p2_is_400(client, p2):
     status, body = get(client, {"p1": HANK, "p2": p2})
     assert status == 400
-    assert "p2 must be a positive player ID" in body
+    assert "p2 must be a positive whole number." in body
+
+
+def test_blank_p2_shows_second_player_picker(client):
+    status, body = get(client, {"p1": HANK, "p2": ""})
+    assert status == 200 and "Compare Hank Baseline" in body
 
 
 def test_same_player_twice_is_400(client):
@@ -43,6 +62,7 @@ def test_same_player_twice_is_400(client):
     {"p1": HANK, "p2": 999999},
     {"p1": 999999, "p2": HANK},
     {"p1": 999999},                   # picker for an unknown first player
+    {"p2": 999999},                   # first-player picker carrying an unknown p2
 ])
 def test_unknown_id_is_404(client, query):
     status, body = get(client, query)

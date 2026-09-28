@@ -121,7 +121,7 @@ def test_season_rows_link_and_mark_2020_and_multi_team(client):
     assert "2020: 60-game season" in body
     assert 'Multiple<span class="fn-mark">&dagger;</span>' in body
     assert "one combined row" in body
-    assert 'href="/team/TSA">TSA</a>' in body
+    assert 'href="/team/TSA?season=2015">TSA</a>' in body
 
 
 def test_ip_uses_display_notation_per_season(client):

@@ -52,13 +52,14 @@ def create_app(test_config=None):
     charts.init_app(app)
     queries.init_app(app)     # parses queries/analysis.sql; raises on any mismatch
 
-    from . import compare, main, notes, players, query_views
+    from . import compare, main, notes, players, query_views, teams
     app.register_blueprint(main.bp)
     app.register_blueprint(notes.bp)
     app.register_blueprint(players.bp)
     app.register_blueprint(compare.bp)
     app.register_blueprint(charts.bp)
     app.register_blueprint(query_views.bp)
+    app.register_blueprint(teams.bp)
 
     _register_security_headers(app)
     _register_error_handlers(app)

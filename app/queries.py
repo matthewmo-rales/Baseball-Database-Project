@@ -48,27 +48,27 @@ class Entry:
     query_id: str
     params: tuple = ()
     requires_payroll: bool = False
-    chart: str | None = None        # chunk 5 hook; empty for now
+    chart: str | None = None        # name of a builder in charts.QUERY_CHARTS
 
 
 REGISTRY = {
-    "top-woba-by-season":        Entry("Q01"),
+    "top-woba-by-season":        Entry("Q01", chart="woba_leaderboard"),
     "top-war-by-position":       Entry("Q02"),
-    "payroll-efficiency":        Entry("Q03", requires_payroll=True),
+    "payroll-efficiency":        Entry("Q03", requires_payroll=True, chart="payroll_vs_win_pct"),
     "strikeout-leaders":         Entry("Q04"),
     "career-war-trajectory":     Entry("Q05", params=(PLAYER,)),
     "war-risers-and-fallers":    Entry("Q06"),
     "war-percentile-by-position": Entry("Q07"),
     "cumulative-career-totals":  Entry("Q08"),
     "war-streaks":               Entry("Q09"),
-    "birth-cohort-war":          Entry("Q10"),
+    "birth-cohort-war":          Entry("Q10", chart="birth_cohorts"),
     "team-cost-per-war":         Entry("Q11", requires_payroll=True),
     "pythag-luck":               Entry("Q12a"),
     "pythag-luck-persistence":   Entry("Q12b"),
     "team-change-impact":        Entry("Q13"),
     "position-value-trend":      Entry("Q14"),
     "breakout-seasons":          Entry("Q15"),
-    "aging-curves":              Entry("Q16"),
+    "aging-curves":              Entry("Q16", chart="age_curves"),
     "war-consistency":           Entry("Q17"),
     "comparable-hitters":        Entry("Q18", params=(PLAYER, SEASON)),
     "era-fip-regression":        Entry("Q19"),
@@ -320,13 +320,19 @@ def _file_order(query):
 @dataclass
 class Result:
     columns: list
-    rows: list          # at most MAX_DISPLAY_ROWS
-    row_count: int      # all rows the query returned
+    rows: list          # every row the query returned (the page caps display)
     elapsed_ms: float
 
     @property
-    def truncated(self):
-        return self.row_count > len(self.rows)
+    def row_count(self):
+        return len(self.rows)
+
+    def index(self, column):
+        return self.columns.index(column)
+
+    def records(self):
+        """Rows as dicts keyed by column name (for chart builders)."""
+        return [dict(zip(self.columns, row)) for row in self.rows]
 
 
 def execute(db, sql, params=()):
@@ -337,8 +343,38 @@ def execute(db, sql, params=()):
     rows = cur.fetchall()
     elapsed = (time.perf_counter() - start) * 1000
     columns = [d[0] for d in cur.description]
-    return Result(columns, rows[:MAX_DISPLAY_ROWS], len(rows), elapsed)
+    return Result(columns, rows, elapsed)
+
+
+# Output columns that hold a season, for the post-query season filter.
+SEASON_COLUMNS = ("season_year", "season")
+
+
+def season_column(columns):
+    """Index of the result's season column, or None."""
+    return next((columns.index(c) for c in SEASON_COLUMNS if c in columns), None)
+
+
+def filter_season(result, season):
+    """A Result with only that season's rows (filtered in Python, after the
+    query ran; the SQL is unchanged). season None returns result as-is."""
+    if season is None:
+        return result
+    i = season_column(result.columns)
+    return Result(result.columns, [r for r in result.rows if r[i] == season], result.elapsed_ms)
+
+
+def check_charts(saved, builders):
+    """Every chart hook names a builder, and charted queries take no params."""
+    for q in saved.values():
+        if q.chart and q.chart not in builders:
+            raise QueryFileError(f"{q.query_id}: unknown chart builder {q.chart!r}")
+        if q.chart and q.params:
+            raise QueryFileError(f"{q.query_id}: charted queries must not take params")
 
 
 def init_app(app):
-    app.extensions["saved_queries"] = load(app.config.get("QUERIES_FILE", QUERIES_FILE))
+    from .charts import QUERY_CHARTS
+    saved = load(app.config.get("QUERIES_FILE", QUERIES_FILE))
+    check_charts(saved, QUERY_CHARTS)
+    app.extensions["saved_queries"] = saved

@@ -9,8 +9,7 @@
 {%- if row.is_multi_team -%}
 Multiple<span class="fn-mark">&dagger;</span>
 {%- elif row.team_id -%}
-{# /team/<id> arrives in chunk 5 #}
-<a href="/team/{{ row.team_id|urlencode }}">{{ row.fangraphs_abbrev or row.team_id }}</a>
+<a href="{{ url_for('teams.team', team_id=row.team_id, season=row.season_year) }}">{{ row.fangraphs_abbrev or row.team_id }}</a>
 {%- else -%}—{%- endif -%}
 {%- endmacro %}
 

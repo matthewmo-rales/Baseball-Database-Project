@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}{{ team.team_name }} · Baseball Analytics{% endblock %}
+{% block content %}
+<header class="player-header">
+  <h1>{{ team.team_name }}</h1>
+  <p class="player-meta">
+    {% if team.city %}{{ team.city }} · {% endif %}{{ team.league }} {{ team.division_name }}
+    · FanGraphs <span class="mono">{{ team.fangraphs_abbrev or team.team_id }}</span>
+    {%- if team.first_season %} · Since {{ team.first_season }}{% endif %}
+    {%- if team.last_season %} · Through {{ team.last_season }}{% endif %}
+  </p>
+  <p class="caption">Names shown are current franchise names.</p>
+</header>
+
+{% if not payroll_loaded %}
+<div class="notice panel" role="status">
+  <p><strong>Payroll data not loaded.</strong> Payroll comes from an optional hand-built CSV that is not included
+    in the repository (see <code>database/README.md</code>), so the payroll columns show &mdash;.</p>
+</div>
+{% endif %}
+
+<section>
+  <h2>Seasons</h2>
+  {% if history %}
+  <div class="table-scroll">
+  <table class="results stats">
+    <thead>
+      <tr>
+        <th scope="col">Season</th>
+        <th scope="col" class="num">W</th>
+        <th scope="col" class="num">L</th>
+        <th scope="col" class="num">Win%</th>
+        <th scope="col" class="num">RS</th>
+        <th scope="col" class="num">RA</th>
+        <th scope="col" class="num">Run diff</th>
+        <th scope="col" class="num">Pythag win%</th>
+        <th scope="col" class="num">Payroll ($M)</th>
+        <th scope="col" class="num">Payroll vs league avg</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in history %}
+      <tr>
+        <td><a href="{{ url_for('teams.team', team_id=team.team_id, season=r.season_year) }}">{{ r.season_year }}</a>
+          {%- if r.is_shortened %}<span class="fn-mark">*</span>{% endif %}</td>
+        <td class="num">{{ r.wins|num }}</td>
+        <td class="num">{{ r.losses|num }}</td>
+        <td class="num">{{ r.win_pct|rate3 }}</td>
+        <td class="num">{{ r.runs_scored|num }}</td>
+        <td class="num">{{ r.runs_allowed|num }}</td>
+        <td class="num">{{ r.run_differential|signed(0) }}</td>
+        <td class="num">{{ r.pythag_win_pct|rate3 }}</td>
+        <td class="num">{{ r.payroll_millions|dec(1) }}</td>
+        <td class="num">{% if r.payroll_vs_avg is none %}—{% else %}{{ r.payroll_vs_avg|dec(2) }}&times;{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <ul class="footnotes">
+    {% for r in history|selectattr("is_shortened") %}
+    <li><span class="fn-mark">*</span> {{ r.season_year }}: {{ r.scheduled_games }}-game season; payroll is prorated in the source.</li>
+    {% endfor %}
+    <li>Payroll vs league average: this team's payroll divided by the mean payroll of all teams that season (1.00&times; = average).</li>
+  </ul>
+  {% else %}
+  <p class="notice">No team seasons in the data.</p>
+  {% endif %}
+</section>
+
+{% if season %}
+<section>
+  <h2>Roster, {{ season }}</h2>
+  <form class="search filter" method="get" action="{{ url_for('teams.team', team_id=team.team_id) }}">
+    <label for="season">Season</label>
+    <select id="season" name="season">
+      {% for y in roster_seasons %}
+      <option value="{{ y }}"{% if y == season %} selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Show roster</button>
+  </form>
+  <p class="caption">Players who appeared for more than one team this season are not listed: the source reports their season as one combined row.</p>
+  {% set hitter_war = hitters|map(attribute="war")|select("number")|sum %}
+  {% set pitcher_war = pitchers|map(attribute="war")|select("number")|sum %}
+  <p class="hint">WAR from these rows: hitters {{ hitter_war|dec(1) }}, pitchers {{ pitcher_war|dec(1) }}, total {{ (hitter_war + pitcher_war)|dec(1) }}.</p>
+
+  <h3>Hitters</h3>
+  {% if hitters %}
+  <div class="table-scroll">
+  <table class="results stats">
+    <thead>
+      <tr>
+        <th scope="col">Player</th>
+        <th scope="col" class="num">PA</th>
+        <th scope="col" class="num">HR</th>
+        <th scope="col" class="num">AVG</th>
+        <th scope="col" class="num">OBP</th>
+        <th scope="col" class="num">SLG</th>
+        <th scope="col" class="num">wOBA</th>
+        <th scope="col" class="num">wRC+</th>
+        <th scope="col" class="num">WAR</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in hitters %}
+      <tr>
+        <td><a href="{{ url_for('players.player', player_id=r.player_id) }}">{{ r.full_name }}</a></td>
+        <td class="num">{{ r.plate_appearances|num }}</td>
+        <td class="num">{{ r.home_runs|num }}</td>
+        <td class="num">{{ r.batting_avg|rate3 }}</td>
+        <td class="num">{{ r.obp|rate3 }}</td>
+        <td class="num">{{ r.slg|rate3 }}</td>
+        <td class="num">{{ r.woba|rate3 }}</td>
+        <td class="num">{{ r.wrc_plus|num }}</td>
+        <td class="num">{{ r.war|dec(1) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="hint">No single-team batting rows for {{ season }}.</p>
+  {% endif %}
+
+  <h3>Pitchers</h3>
+  {% if pitchers %}
+  <div class="table-scroll">
+  <table class="results stats">
+    <thead>
+      <tr>
+        <th scope="col">Player</th>
+        <th scope="col" class="num">G</th>
+        <th scope="col" class="num">GS</th>
+        <th scope="col" class="num">IP</th>
+        <th scope="col" class="num">ERA</th>
+        <th scope="col" class="num">FIP</th>
+        <th scope="col" class="num">ERA-</th>
+        <th scope="col" class="num">WAR</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in pitchers %}
+      <tr>
+        <td><a href="{{ url_for('players.player', player_id=r.player_id) }}">{{ r.full_name }}</a></td>
+        <td class="num">{{ r.games|num }}</td>
+        <td class="num">{{ r.games_started|num }}</td>
+        <td class="num">{{ r.ip_display|dec(1) }}</td>
+        <td class="num">{{ r.era|dec(2) }}</td>
+        <td class="num">{{ r.fip|dec(2) }}</td>
+        <td class="num">{{ r.era_minus|num }}</td>
+        <td class="num">{{ r.war|dec(1) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="hint">No single-team pitching rows for {{ season }}.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

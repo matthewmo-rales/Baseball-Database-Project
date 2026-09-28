@@ -109,6 +109,7 @@ STAT_BATTING = [
     (900012, 2016, "TSA", 0, 158, 610, 550, 165, 33, 3, 24, 95, 95, 52, 2, 4, 100, 4, 0, 10, 3, .360, 130, 4.5, 12.0, 5.0, 1.0),
     # Kurt Slugwell, DH: qualified 2015.
     (900013, 2015, "TSA", 0, 150, 600, 530, 150, 30, 1, 35, 90, 100, 60, 5, 5, 140, 5, 0, 0, 0, .400, 150, 3.5, 25.0, -10.0, -1.0),
+    (900013, 2017, "TSA", 0, 140, 560, 500, 130, 25, 1, 30, 80, 90, 55, 4, 5, 130, 0, 0, 0, 0, .380, 140, 3.0, 20.0, -9.0, -1.0),
     # Lou Nowhere, no position.
     (900014, 2016, "TSB", 0, 20, 50, 45, 10, 2, 0, 1, 5, 4, 4, 0, 0, 10, 1, 0, 0, 0, .290, 80, 0.1, 0.0, 0.0, 0.0),
     # Otto Bothways, DH and pitcher: qualified hitter 2015-16.
@@ -146,6 +147,25 @@ STAT_PITCHING = [
     *[_filler_pitch(pid, war) for pid, war in zip(range(900030, 900035), (2.0, 2.0, 3.0, 1.0, 2.0))],
 ]
 
+
+# Fictional cohort players so Q10 and Q16 return rows: 25 OF born 1990 and 15 C
+# born 1991, each with unqualified 300-PA seasons for TSB in 2015 and 2016.
+# Q10: the 1990 cohort has 26 players (these 25 + Jules). Q16: 25 OF pairs
+# into age 26 and 15 C pairs into age 25 (its minimum is 15 pairs).
+COHORT_PLAYERS = (
+    [(900200 + i, f"Cohort Outfielder {i:02d}", "1990-03-01", "OF", "R", "R", 2014) for i in range(25)]
+    + [(900230 + i, f"Cohort Catcher {i:02d}", "1991-03-01", "C", "R", "R", 2014) for i in range(15)]
+)
+
+
+def _cohort_bat(pid, year, i):
+    wrc = 95 + i + (3 if year == 2016 else 0) - (i % 4)
+    return (pid, year, "TSB", 0, 90, 300, 270, 70, 12, 1, 6, 30, 28, 25, 0, 2, 60, 3, 0, 2, 1,
+            .310, wrc, round(0.2 + 0.05 * i, 2), 0.0, 0.0, 0.0)
+
+
+COHORT_BATTING = [_cohort_bat(pid, year, i) for i, (pid, *_rest) in enumerate(COHORT_PLAYERS)
+                  for year in (2015, 2016)]
 
 # Fictional team-seasons with payroll, so Q03 and Q11 have data (8 rows).
 TEAM_STATS_COLS = ("team_id, season_year, games_played, wins, losses, runs_scored, runs_allowed,"
@@ -197,6 +217,10 @@ def build_test_db(path):
         _insert(conn, "batting_stats", BATTING_COLS, STAT_BATTING)
         _insert(conn, "pitching_stats", PITCHING_COLS, STAT_PITCHING)
         _insert(conn, "team_stats", TEAM_STATS_COLS, TEAM_STATS)
+        _insert(conn, "players",
+                "player_id, full_name, birth_date, primary_position, bats, throws, debut_year",
+                COHORT_PLAYERS)
+        _insert(conn, "batting_stats", BATTING_COLS, COHORT_BATTING)
         conn.commit()
     finally:
         conn.close()
