@@ -11,7 +11,7 @@ from flask import Flask, render_template
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import CSRFError
 
-from . import db
+from . import charts, db, formatting
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -48,10 +48,15 @@ def create_app(test_config=None):
 
     csrf.init_app(app)
     db.init_app(app)
+    formatting.init_app(app)
+    charts.init_app(app)
 
-    from . import main, notes
+    from . import compare, main, notes, players
     app.register_blueprint(main.bp)
     app.register_blueprint(notes.bp)
+    app.register_blueprint(players.bp)
+    app.register_blueprint(compare.bp)
+    app.register_blueprint(charts.bp)
 
     _register_security_headers(app)
     _register_error_handlers(app)
@@ -81,10 +86,17 @@ def _register_security_headers(app):
         return response
 
 
+def _custom_message(e):
+    """The text passed to abort(code, "..."), or None for Werkzeug's default."""
+    if e.description and e.description != type(e).description:
+        return e.description
+    return None
+
+
 def _register_error_handlers(app):
     @app.errorhandler(400)
     def bad_request(e):
-        return render_template("errors/400.html"), 400
+        return render_template("errors/400.html", message=_custom_message(e)), 400
 
     @app.errorhandler(CSRFError)
     def csrf_failed(e):
@@ -92,7 +104,7 @@ def _register_error_handlers(app):
 
     @app.errorhandler(404)
     def not_found(e):
-        return render_template("errors/404.html"), 404
+        return render_template("errors/404.html", message=_custom_message(e)), 404
 
     @app.errorhandler(405)
     def method_not_allowed(e):

@@ -1,0 +1,25 @@
+{# Chart plumbing. Pages that call chart() must also call chart_head() in the
+   head block and chart_scripts() in the scripts block. #}
+
+{% macro chart_head() -%}
+{# plotly.js skips its own <style> injection when this element exists, which
+   keeps style-src 'self' (see app/charts.py). The id must stay exactly this. #}
+<link id="plotly.js-style-global" class="no-inline-styles" rel="stylesheet"
+      href="{{ url_for('charts.plotly_css', v=plotly_version) }}">
+{% if plotly_maplibre_style_id %}
+{# Same trick for the <style> the bundled MapLibre injects at load. #}
+<link id="{{ plotly_maplibre_style_id }}" rel="stylesheet"
+      href="{{ url_for('charts.maplibre_css', v=plotly_version) }}">
+{% endif %}
+{%- endmacro %}
+
+{% macro chart_scripts() -%}
+<script src="{{ url_for('charts.plotly_js', v=plotly_version) }}" defer></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}" defer></script>
+{%- endmacro %}
+
+{% macro chart(src, label) -%}
+<div class="chart" data-chart-src="{{ src }}" role="figure" aria-label="{{ label }}">
+  <p class="chart-loading">Loading chart&hellip;</p>
+</div>
+{%- endmacro %}

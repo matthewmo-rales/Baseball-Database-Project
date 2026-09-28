@@ -1,0 +1,29 @@
+{# Cells shared by the player page tables. #}
+
+{% macro season_cell(player_id, row) -%}
+<a href="{{ url_for('players.season', player_id=player_id, year=row.season_year) }}">{{ row.season_year }}</a>
+{%- if row.is_shortened %}<span class="fn-mark">*</span>{% endif %}
+{%- endmacro %}
+
+{% macro team_cell(row) -%}
+{%- if row.is_multi_team -%}
+Multiple<span class="fn-mark">&dagger;</span>
+{%- elif row.team_id -%}
+{# /team/<id> arrives in chunk 5 #}
+<a href="/team/{{ row.team_id|urlencode }}">{{ row.fangraphs_abbrev or row.team_id }}</a>
+{%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+{% macro footnotes(rows, context_metrics) -%}
+{% set short = rows|selectattr("is_shortened")|list %}
+{% set multi = rows|selectattr("is_multi_team")|list %}
+<ul class="footnotes">
+  {% for r in short %}
+  <li><span class="fn-mark">*</span> {{ r.season_year }}: {{ r.scheduled_games }}-game season. Counting stats are not scaled.</li>
+  {% endfor %}
+  {% if multi %}
+  <li><span class="fn-mark">&dagger;</span> Played for more than one team. The source gives one combined row for the season, so per-team splits aren't available.</li>
+  {% endif %}
+  <li><span class="fn-mark">&Dagger;</span> {{ context_metrics }} are league- and park-weighted, so summing or averaging season values would be wrong. Totals recompute the other rates from summed components.</li>
+</ul>
+{%- endmacro %}

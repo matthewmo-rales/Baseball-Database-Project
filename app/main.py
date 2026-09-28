@@ -1,4 +1,6 @@
 """Blueprint "main": player search at /."""
+from collections import namedtuple
+
 from flask import Blueprint, render_template, request
 
 from .db import get_ro_db, search_key
@@ -9,14 +11,17 @@ MIN_QUERY_LEN = 2
 MAX_QUERY_LEN = 50
 RESULT_LIMIT = 25
 
-# One round trip: match up to 25 players, then take first/last season across
-# both stat tables for just those players. Two-way and pitcher-only players
-# have rows in both tables (pitchers carry 0-PA batting rows).
+# One round trip: match up to RESULT_LIMIT + 1 players (the extra row only
+# says "there are more"), then take first/last season across both stat tables
+# for just those players. Two-way and pitcher-only players have rows in both
+# tables (pitchers carry 0-PA batting rows). `player_id IS NOT ?` with NULL
+# excludes nobody; the compare picker binds p1 there.
 SEARCH_SQL = """
 WITH matched AS (
     SELECT player_id, full_name, birth_date, primary_position
     FROM players
     WHERE search_key(full_name) LIKE ? ESCAPE '\\'
+      AND player_id IS NOT ?
     ORDER BY full_name, player_id
     LIMIT ?
 ),
@@ -39,6 +44,10 @@ GROUP BY m.player_id, m.full_name, m.birth_date, m.primary_position
 ORDER BY m.full_name, m.player_id
 """
 
+# results is None when no search ran (empty or invalid q); more is True when
+# matches beyond the first RESULT_LIMIT exist.
+Search = namedtuple("Search", "q results message more")
+
 
 def like_pattern(raw):
     """Substring LIKE pattern with \\, % and _ escaped.
@@ -51,27 +60,30 @@ def like_pattern(raw):
     return "%" + escaped + "%"
 
 
+def search_players(raw_q, exclude_id=None):
+    """Validate and run a name search. Shared by / and the compare picker."""
+    q = (raw_q or "").strip()
+    if not q:
+        return Search(q, None, None, False)
+    if len(q) < MIN_QUERY_LEN:
+        return Search(q, None, f"Enter at least {MIN_QUERY_LEN} characters.", False)
+    if len(q) > MAX_QUERY_LEN:
+        return Search(q, None, f"Search is limited to {MAX_QUERY_LEN} characters.", False)
+    rows = get_ro_db().execute(
+        SEARCH_SQL, (like_pattern(q), exclude_id, RESULT_LIMIT + 1)
+    ).fetchall()
+    return Search(q, rows[:RESULT_LIMIT], None, len(rows) > RESULT_LIMIT)
+
+
 @bp.route("/")
 def index():
-    q = request.args.get("q", "").strip()
-    results = None
-    message = None
-
-    if q:
-        if len(q) < MIN_QUERY_LEN:
-            message = f"Enter at least {MIN_QUERY_LEN} characters."
-        elif len(q) > MAX_QUERY_LEN:
-            message = f"Search is limited to {MAX_QUERY_LEN} characters."
-        else:
-            results = get_ro_db().execute(
-                SEARCH_SQL, (like_pattern(q), RESULT_LIMIT)
-            ).fetchall()
-
+    search = search_players(request.args.get("q", ""))
     return render_template(
         "index.html",
-        q=q,
-        results=results,
-        message=message,
+        q=search.q,
+        results=search.results,
+        message=search.message,
+        more=search.more,
         limit=RESULT_LIMIT,
         max_len=MAX_QUERY_LEN,
     )

@@ -14,7 +14,11 @@
 {% elif results is not none %}
   {% if results %}
     <p class="result-count">
-      {{ results|length }} match{{ "es" if results|length != 1 }} for &ldquo;{{ q }}&rdquo;{% if results|length == limit %}; showing the first {{ limit }}, so narrow your search if you don't see the player{% endif %}.
+      {% if more -%}
+        Showing the first {{ limit }} matches for &ldquo;{{ q }}&rdquo;. More players match, so refine your search if you don't see the one you want.
+      {%- else -%}
+        {{ results|length }} match{{ "es" if results|length != 1 }} for &ldquo;{{ q }}&rdquo;.
+      {%- endif %}
     </p>
     <table class="results">
       <thead>
@@ -30,7 +34,7 @@
       <tbody>
         {% for r in results %}
         <tr>
-          <td><a href="/player/{{ r.player_id }}">{{ r.full_name }}</a></td>
+          <td><a href="{{ url_for('players.player', player_id=r.player_id) }}">{{ r.full_name }}</a></td>
           <td class="num">{{ r.player_id }}</td>
           <td class="num">{{ r.birth_year if r.birth_year is not none else "—" }}</td>
           <td>{{ r.primary_position or "—" }}</td>

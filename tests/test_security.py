@@ -103,8 +103,13 @@ def test_output_is_autoescaped(client):
 
 @pytest.mark.parametrize("template", sorted(TEMPLATES.rglob("*.html")), ids=lambda p: p.name)
 def test_templates_have_no_inline_script_style_or_safe(template):
-    src = template.read_text(encoding="utf-8")
-    assert not re.search(r"<script\b", src, re.I)
+    # Jinja comments never reach the browser, so they may mention <style>.
+    src = re.sub(r"\{#.*?#\}", "", template.read_text(encoding="utf-8"), flags=re.S)
+    # External scripts only: every <script> has a src and an empty body.
+    scripts = re.findall(r"<script\b([^>]*)>(.*?)</script\s*>", src, re.I | re.S)
+    assert len(scripts) == len(re.findall(r"<script\b", src, re.I))
+    for attrs, body in scripts:
+        assert re.search(r"\ssrc\s*=", attrs) and body.strip() == ""
     assert not re.search(r"<style\b", src, re.I)
     assert not re.search(r"\sstyle\s*=", src, re.I)
     assert not re.search(r"\son[a-z]+\s*=", src, re.I)

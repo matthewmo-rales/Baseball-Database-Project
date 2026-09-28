@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ player.full_name }} {{ season.season_year }} · Baseball Analytics{% endblock %}
+
+{% macro stat(label, value) -%}
+<div class="stat"><dt>{{ label }}</dt><dd>{{ value }}</dd></div>
+{%- endmacro %}
+
+{% macro team(row) -%}
+{%- if row.is_multi_team -%}Multiple teams
+{%- elif row.team_id -%}<a href="/team/{{ row.team_id|urlencode }}">{{ row.fangraphs_abbrev or row.team_id }}</a>
+{%- else -%}—{%- endif -%}
+{%- endmacro %}
+
+{% macro ranks(items, group) -%}
+<ul class="ranks">
+  {% for r in items %}
+  <li><span class="rank-label">{{ r.label }}</span>
+    {% if r.rank is none -%}
+      —
+    {%- else -%}
+      {% if r.tied %}tied {% endif %}{{ r.rank|ordinal }} of {{ r.n }} qualified {{ group }}
+    {%- endif %}</li>
+  {% endfor %}
+</ul>
+{%- endmacro %}
+
+{% block content %}
+{% include "players/_header.html" %}
+<p class="breadcrumb">
+  <a href="{{ url_for('players.player', player_id=player.player_id) }}">&larr; All seasons</a>
+</p>
+<h2 class="season-title">{{ season.season_year }} season</h2>
+
+{% if season.is_shortened %}
+<p class="notice banner">{{ season.scheduled_games }}-game season. Counting stats are not scaled here.</p>
+{% endif %}
+{% if (batting and batting.is_multi_team) or (pitching and pitching.is_multi_team) %}
+<p class="notice banner">Played for more than one team this season. The source gives one combined row, so per-team splits aren't available.</p>
+{% endif %}
+
+{% if batting %}
+{% set b = batting %}
+<section>
+  <h2>Batting <span class="count">· {{ team(b) }}</span></h2>
+  <dl class="stat-grid">
+    {{ stat("G", b.games|num) }}
+    {{ stat("PA", b.plate_appearances|num) }}
+    {{ stat("AB", b.at_bats|num) }}
+    {{ stat("H", b.hits|num) }}
+    {{ stat("2B", b.doubles|num) }}
+    {{ stat("3B", b.triples|num) }}
+    {{ stat("HR", b.home_runs|num) }}
+    {{ stat("R", b.runs|num) }}
+    {{ stat("RBI", b.rbi|num) }}
+    {{ stat("BB", b.walks|num) }}
+    {{ stat("IBB", b.intentional_walks|num) }}
+    {{ stat("HBP", b.hit_by_pitch|num) }}
+    {{ stat("K", b.strikeouts|num) }}
+    {{ stat("SF", b.sac_flies|num) }}
+    {{ stat("SH", b.sac_hits|num) }}
+    {{ stat("SB", b.stolen_bases|num) }}
+    {{ stat("CS", b.caught_stealing|num) }}
+  </dl>
+  <dl class="stat-grid">
+    {{ stat("AVG", b.batting_avg|rate3) }}
+    {{ stat("OBP", b.obp|rate3) }}
+    {{ stat("SLG", b.slg|rate3) }}
+    {{ stat("OPS", b.ops|rate3) }}
+    {{ stat("ISO", b.iso|rate3) }}
+    {{ stat("BB%", b.bb_pct|pct) }}
+    {{ stat("K%", b.k_pct|pct) }}
+  </dl>
+  <dl class="stat-grid">
+    {{ stat("wOBA", b.woba|rate3) }}
+    {{ stat("wRC+", b.wrc_plus|num) }}
+    {{ stat("Off", b.off_runs|signed) }}
+    {{ stat("Def", b.def_runs|signed) }}
+    {{ stat("BsR", b.bsr|signed) }}
+    {{ stat("WAR", b.war|dec(1)) }}
+  </dl>
+
+  <h3>League context</h3>
+  {% if hitter_ranks %}
+    {{ ranks(hitter_ranks, "hitters") }}
+  {% else %}
+    <p class="hint">Not a qualified hitter in {{ season.season_year }}, so no rank: qualifying needs
+      {{ min_pa }} PA (3.1 per scheduled game &times; {{ season.scheduled_games }}); {{ player.full_name }} had {{ b.plate_appearances }}.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if pitching %}
+{% set p = pitching %}
+<section>
+  <h2>Pitching <span class="count">· {{ team(p) }}</span></h2>
+  <dl class="stat-grid">
+    {{ stat("W", p.wins|num) }}
+    {{ stat("L", p.losses|num) }}
+    {{ stat("SV", p.saves|num) }}
+    {{ stat("G", p.games|num) }}
+    {{ stat("GS", p.games_started|num) }}
+    {{ stat("IP", p.ip_display|dec(1)) }}
+    {{ stat("TBF", p.batters_faced|num) }}
+    {{ stat("H", p.hits_allowed|num) }}
+    {{ stat("R", p.runs_allowed|num) }}
+    {{ stat("ER", p.earned_runs|num) }}
+    {{ stat("HR", p.home_runs_allowed|num) }}
+    {{ stat("BB", p.walks|num) }}
+    {{ stat("IBB", p.intentional_walks|num) }}
+    {{ stat("HBP", p.hit_batters|num) }}
+    {{ stat("K", p.strikeouts|num) }}
+  </dl>
+  <dl class="stat-grid">
+    {{ stat("ERA", p.era|dec(2)) }}
+    {{ stat("WHIP", p.whip|dec(2)) }}
+    {{ stat("K/9", p.k_per_9|dec(2)) }}
+    {{ stat("BB/9", p.bb_per_9|dec(2)) }}
+    {{ stat("HR/9", p.hr_per_9|dec(2)) }}
+    {{ stat("K/BB", p.k_bb_ratio|dec(2)) }}
+    {{ stat("LOB%", p.lob_pct|pct(1, true)) }}
+    {{ stat("BABIP", p.babip_against|rate3) }}
+  </dl>
+  <dl class="stat-grid">
+    {{ stat("FIP", p.fip|dec(2)) }}
+    {{ stat("xFIP", p.xfip|dec(2)) }}
+    {{ stat("ERA-", p.era_minus|num) }}
+    {{ stat("FIP-", p.fip_minus|num) }}
+    {{ stat("ERA+", p.era_plus|num) }}
+    {{ stat("WAR", p.war|dec(1)) }}
+  </dl>
+
+  <h3>League context</h3>
+  {% if pitcher_ranks %}
+    {{ ranks(pitcher_ranks, "pitchers") }}
+    <p class="hint">ERA- and FIP rank ascending: lower is better.</p>
+  {% else %}
+    <p class="hint">Not a qualified pitcher in {{ season.season_year }}, so no rank: qualifying needs
+      {{ min_outs|ip_from_outs }} IP (one per scheduled game); {{ player.full_name }} threw {{ p.ip_display|dec(1) }}.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

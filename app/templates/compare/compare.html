@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "_charts.html" import chart, chart_head, chart_scripts %}
+{% set a, b = sides %}
+{% block title %}{{ a.player.full_name }} vs {{ b.player.full_name }} · Baseball Analytics{% endblock %}
+{% block head %}{{ chart_head() }}{% endblock %}
+
+{% macro row(label, key, filter_name, section=None) -%}
+<tr>
+  <th scope="row">{{ label }}</th>
+  {% for side in sides %}
+    {% set src = side[section] if section else side %}
+    <td class="num">
+      {%- if src is none -%}—
+      {%- elif filter_name == "rate3" -%}{{ src[key]|rate3 }}
+      {%- elif filter_name == "dec1" -%}{{ src[key]|dec(1) }}
+      {%- elif filter_name == "dec2" -%}{{ src[key]|dec(2) }}
+      {%- elif filter_name == "ip" -%}{{ src[key]|ip_from_outs }}
+      {%- else -%}{{ src[key]|num }}
+      {%- endif -%}
+    </td>
+  {% endfor %}
+</tr>
+{%- endmacro %}
+
+{% block content %}
+<h1>{{ a.player.full_name }} vs {{ b.player.full_name }}</h1>
+
+<div class="table-scroll">
+<table class="results stats compare">
+  <thead>
+    <tr>
+      <th scope="col"><span class="visually-hidden">Stat</span></th>
+      {% for side in sides %}
+      <th scope="col" class="num">
+        <a href="{{ url_for('players.player', player_id=side.player.player_id) }}">{{ side.player.full_name }}</a><br>
+        <span class="mono">ID {{ side.player.player_id }}</span>
+        · b. {{ side.player.birth_year if side.player.birth_year is not none else "—" }}
+        · {{ side.player.primary_position or "—" }}
+      </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {{ row("Seasons played", "seasons", "num") }}
+    <tr>
+      <th scope="row">Best-season WAR</th>
+      {% for side in sides %}
+      <td class="num">{% if side.best %}{{ side.best.war|dec(1) }} ({{ side.best.season_year }}){% else %}—{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {{ row("WAR, batting + pitching", "combined_war", "dec1") }}
+  </tbody>
+  {% if a.batting or b.batting %}
+  <tbody>
+    <tr class="group"><th scope="rowgroup" colspan="3">Batting</th></tr>
+    {{ row("G", "games", "num", "batting") }}
+    {{ row("PA", "plate_appearances", "num", "batting") }}
+    {{ row("HR", "home_runs", "num", "batting") }}
+    {{ row("R", "runs", "num", "batting") }}
+    {{ row("RBI", "rbi", "num", "batting") }}
+    {{ row("SB", "stolen_bases", "num", "batting") }}
+    {{ row("AVG", "batting_avg", "rate3", "batting") }}
+    {{ row("OBP", "obp", "rate3", "batting") }}
+    {{ row("SLG", "slg", "rate3", "batting") }}
+    {{ row("Batting WAR", "war", "dec1", "batting") }}
+  </tbody>
+  {% endif %}
+  {% if a.pitching or b.pitching %}
+  <tbody>
+    <tr class="group"><th scope="rowgroup" colspan="3">Pitching</th></tr>
+    {{ row("G", "games", "num", "pitching") }}
+    {{ row("GS", "games_started", "num", "pitching") }}
+    {{ row("IP", "outs_recorded", "ip", "pitching") }}
+    {{ row("K", "strikeouts", "num", "pitching") }}
+    {{ row("BB", "walks", "num", "pitching") }}
+    {{ row("ERA", "era", "dec2", "pitching") }}
+    {{ row("WHIP", "whip", "dec2", "pitching") }}
+    {{ row("K/9", "k_per_9", "dec2", "pitching") }}
+    {{ row("Pitching WAR", "war", "dec1", "pitching") }}
+  </tbody>
+  {% endif %}
+</table>
+</div>
+<p class="hint">
+  2015&ndash;2025 totals only; seasons before 2015 are not in the data. Rates are recomputed from summed
+  components. wOBA, wRC+, FIP, xFIP and ERA- are left out because they are league- and park-weighted, so
+  totals or averages of season values would be wrong. Best-season WAR is raw, not scaled for 2020.
+</p>
+
+<section class="chart-section">
+  <h2>WAR per 162 games</h2>
+  {{ chart(url_for('compare.war_chart', p1=p1, p2=p2),
+           "Line chart comparing " ~ a.player.full_name ~ " and " ~ b.player.full_name ~ " by WAR per 162 games") }}
+  <p class="caption">Batting plus pitching WAR, scaled to a 162-game season (WAR &times; 162 &divide; scheduled games).
+    Solid line with circles: {{ a.player.full_name }}. Dotted line with squares: {{ b.player.full_name }}.</p>
+</section>
+
+<p><a href="{{ url_for('compare.compare', p1=p1) }}">Compare {{ a.player.full_name }} with someone else</a></p>
+{% endblock %}
+{% block scripts %}{{ chart_scripts() }}{% endblock %}

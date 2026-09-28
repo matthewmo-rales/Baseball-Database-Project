@@ -1,0 +1,12 @@
+{# Player identity. Expects: player. Names are shared by up to two players,
+   so the ID and birth year are always shown. #}
+<header class="player-header">
+  <h1>{{ player.full_name }}</h1>
+  <p class="player-meta">
+    Player ID <span class="mono">{{ player.player_id }}</span>
+    · {{ player.primary_position or "Position unlisted" }}
+    · Bats {{ player.bats or "—" }} / Throws {{ player.throws or "—" }}
+    · Born {{ player.birth_date or "unknown" }}
+    {%- if player.debut_year is not none %} · MLB debut {{ player.debut_year }}{% endif %}
+  </p>
+</header>

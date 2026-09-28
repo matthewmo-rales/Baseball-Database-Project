@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Baseball Analytics{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
 </head>
 <body>
   <header class="site-header">
@@ -24,5 +25,6 @@
   <footer class="site-footer">
     Season data: FanGraphs. Player register: Chadwick Baseball Bureau.
   </footer>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -197,6 +197,50 @@ h2 .count { color: var(--muted); font-weight: 400; }
   font-size: 0.85rem;
 }
 
+/* ---- player, season and compare pages ---- */
+h3 { font-size: 1rem; margin: 1.25rem 0 0.5rem; }
+.table-scroll { overflow-x: auto; }
+.stats { font-size: 0.9rem; }
+.stats th, .stats td { white-space: nowrap; }
+.stats .num { text-align: right; font-variant-numeric: tabular-nums; }
+.stats tfoot th, .stats tfoot td { font-weight: 600; border-top: 2px solid var(--border); }
+.stats tfoot th { text-align: left; }
+.compare tbody th { text-align: left; font-weight: 400; }
+.compare thead th { vertical-align: bottom; font-size: 0.9rem; color: var(--text); white-space: normal; }
+.compare .group th { font-weight: 600; color: var(--muted); padding-top: 14px; }
+.fn-mark { color: var(--muted); padding-left: 1px; }
+.footnotes { list-style: none; margin: 6px 0 0; padding: 0; color: var(--muted); font-size: 0.85rem; }
+.caption { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+.breadcrumb { margin: 0 0 0.5rem; font-size: 0.9rem; }
+.season-title { font-size: 1.35rem; margin-top: 0.5rem; }
+.banner { margin: 0.5rem 0; }
+.search input[type="hidden"] + label { width: 100%; }
+
+.chart { min-height: 440px; }
+.chart-loading, .chart-failed { color: var(--muted); padding: 16px 0; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.stat {
+  padding: 6px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.stat dt { font-size: 0.75rem; color: var(--muted); }
+.stat dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.ranks { list-style: none; margin: 0 0 8px; padding: 0; }
+.ranks li { padding: 2px 0; }
+.rank-label { display: inline-block; min-width: 56px; font-weight: 600; }
+
+.notes-panel .note-body { margin-bottom: 0; }
+
 @media (max-width: 560px) {
   .results th, .results td { padding: 6px; }
+  .chart { min-height: 360px; }
 }

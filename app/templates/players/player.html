@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% from "_charts.html" import chart, chart_head, chart_scripts %}
+{% from "players/_macros.html" import season_cell, team_cell, footnotes %}
+{% block title %}{{ player.full_name }} ({{ player.player_id }}) · Baseball Analytics{% endblock %}
+{% block head %}{% if has_war %}{{ chart_head() }}{% endif %}{% endblock %}
+{% block content %}
+{% include "players/_header.html" %}
+
+{% if not batting and not pitching %}
+<p class="notice">No batting or pitching seasons for this player in the 2015&ndash;2025 data.</p>
+{% endif %}
+
+{% if has_war %}
+<section class="chart-section">
+  <h2>WAR per 162 games</h2>
+  {{ chart(url_for('players.war_chart', player_id=player.player_id),
+           "Line chart of " ~ player.full_name ~ "'s WAR per 162 games by season") }}
+  <p class="caption">
+    Batting plus pitching WAR, scaled to a 162-game season (WAR &times; 162 &divide; scheduled games).
+    {% if baseline_kind == "hitter" %}
+      The dashed line is the mean for the other qualified hitters listed at {{ player.primary_position }}
+      (3.1 PA per scheduled game); this player's own season is left out.
+      Baseline hidden in seasons with fewer than 5 other qualified players at the position.
+    {% elif baseline_kind == "pitcher" %}
+      The dashed line is the mean for the other qualified pitchers listed at P (one inning per
+      scheduled game); this player's own season is left out.
+      Qualified pitchers are mostly starters; relievers will typically sit below this line.
+      Baseline hidden in seasons with fewer than 5 other qualified players at the position.
+    {% else %}
+      No position baseline: position comparisons use the unambiguous set only
+      (C, 1B, 2B, 3B, SS, OF, and P), and this player is listed as
+      {{ player.primary_position or "no position" }}.
+    {% endif %}
+  </p>
+</section>
+{% endif %}
+
+{% if batting %}
+<section>
+  <h2>Batting</h2>
+  <div class="table-scroll">
+  <table class="results stats">
+    <thead>
+      <tr>
+        <th scope="col">Season</th>
+        <th scope="col">Team</th>
+        <th scope="col" class="num">G</th>
+        <th scope="col" class="num">PA</th>
+        <th scope="col" class="num">HR</th>
+        <th scope="col" class="num">R</th>
+        <th scope="col" class="num">RBI</th>
+        <th scope="col" class="num">SB</th>
+        <th scope="col" class="num">AVG</th>
+        <th scope="col" class="num">OBP</th>
+        <th scope="col" class="num">SLG</th>
+        <th scope="col" class="num">wOBA</th>
+        <th scope="col" class="num">wRC+</th>
+        <th scope="col" class="num">WAR</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in batting %}
+      <tr>
+        <td>{{ season_cell(player.player_id, r) }}</td>
+        <td>{{ team_cell(r) }}</td>
+        <td class="num">{{ r.games|num }}</td>
+        <td class="num">{{ r.plate_appearances|num }}</td>
+        <td class="num">{{ r.home_runs|num }}</td>
+        <td class="num">{{ r.runs|num }}</td>
+        <td class="num">{{ r.rbi|num }}</td>
+        <td class="num">{{ r.stolen_bases|num }}</td>
+        <td class="num">{{ r.batting_avg|rate3 }}</td>
+        <td class="num">{{ r.obp|rate3 }}</td>
+        <td class="num">{{ r.slg|rate3 }}</td>
+        <td class="num">{{ r.woba|rate3 }}</td>
+        <td class="num">{{ r.wrc_plus|num }}</td>
+        <td class="num">{{ r.war|dec(1) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% set t = batting_totals %}
+    <tfoot>
+      <tr class="totals">
+        <th scope="row" colspan="2">2015&ndash;2025 totals</th>
+        <td class="num">{{ t.games|num }}</td>
+        <td class="num">{{ t.plate_appearances|num }}</td>
+        <td class="num">{{ t.home_runs|num }}</td>
+        <td class="num">{{ t.runs|num }}</td>
+        <td class="num">{{ t.rbi|num }}</td>
+        <td class="num">{{ t.stolen_bases|num }}</td>
+        <td class="num" data-total="avg">{{ t.batting_avg|rate3 }}</td>
+        <td class="num" data-total="obp">{{ t.obp|rate3 }}</td>
+        <td class="num" data-total="slg">{{ t.slg|rate3 }}</td>
+        <td class="num" data-total="woba">—<span class="fn-mark">&Dagger;</span></td>
+        <td class="num" data-total="wrc_plus">—<span class="fn-mark">&Dagger;</span></td>
+        <td class="num">{{ t.war|dec(1) }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+  {{ footnotes(batting, "wOBA and wRC+") }}
+</section>
+{% endif %}
+
+{% if pitching %}
+<section>
+  <h2>Pitching</h2>
+  <div class="table-scroll">
+  <table class="results stats">
+    <thead>
+      <tr>
+        <th scope="col">Season</th>
+        <th scope="col">Team</th>
+        <th scope="col" class="num">G</th>
+        <th scope="col" class="num">GS</th>
+        <th scope="col" class="num">IP</th>
+        <th scope="col" class="num">K</th>
+        <th scope="col" class="num">BB</th>
+        <th scope="col" class="num">ERA</th>
+        <th scope="col" class="num">WHIP</th>
+        <th scope="col" class="num">K/9</th>
+        <th scope="col" class="num">FIP</th>
+        <th scope="col" class="num">xFIP</th>
+        <th scope="col" class="num">ERA-</th>
+        <th scope="col" class="num">WAR</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in pitching %}
+      <tr>
+        <td>{{ season_cell(player.player_id, r) }}</td>
+        <td>{{ team_cell(r) }}</td>
+        <td class="num">{{ r.games|num }}</td>
+        <td class="num">{{ r.games_started|num }}</td>
+        <td class="num">{{ r.ip_display|dec(1) }}</td>
+        <td class="num">{{ r.strikeouts|num }}</td>
+        <td class="num">{{ r.walks|num }}</td>
+        <td class="num">{{ r.era|dec(2) }}</td>
+        <td class="num">{{ r.whip|dec(2) }}</td>
+        <td class="num">{{ r.k_per_9|dec(2) }}</td>
+        <td class="num">{{ r.fip|dec(2) }}</td>
+        <td class="num">{{ r.xfip|dec(2) }}</td>
+        <td class="num">{{ r.era_minus|num }}</td>
+        <td class="num">{{ r.war|dec(1) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% set t = pitching_totals %}
+    <tfoot>
+      <tr class="totals">
+        <th scope="row" colspan="2">2015&ndash;2025 totals</th>
+        <td class="num">{{ t.games|num }}</td>
+        <td class="num">{{ t.games_started|num }}</td>
+        <td class="num">{{ t.outs_recorded|ip_from_outs }}</td>
+        <td class="num">{{ t.strikeouts|num }}</td>
+        <td class="num">{{ t.walks|num }}</td>
+        <td class="num" data-total="era">{{ t.era|dec(2) }}</td>
+        <td class="num" data-total="whip">{{ t.whip|dec(2) }}</td>
+        <td class="num" data-total="k_per_9">{{ t.k_per_9|dec(2) }}</td>
+        <td class="num" data-total="fip">—<span class="fn-mark">&Dagger;</span></td>
+        <td class="num" data-total="xfip">—<span class="fn-mark">&Dagger;</span></td>
+        <td class="num" data-total="era_minus">—<span class="fn-mark">&Dagger;</span></td>
+        <td class="num">{{ t.war|dec(1) }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+  {{ footnotes(pitching, "FIP, xFIP and ERA-") }}
+</section>
+{% endif %}
+
+{% if batting or pitching %}
+<p class="hint">The data covers 2015&ndash;2025 only, so totals leave out any seasons before 2015. Select a season for the full stat line and league ranks.</p>
+{% endif %}
+
+<section class="notes-panel">
+  <h2>Notes <span class="count">({{ note_count }})</span></h2>
+  {% if notes %}
+    <ol class="notes">
+      {% for n in notes %}
+      <li class="note">
+        <div class="note-meta">
+          <span class="tag">{{ n.category }}</span>
+          <span>{{ n.created_at[:10] }}</span>
+        </div>
+        <p class="note-body">{{ n.body|truncate(200) }}</p>
+      </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p class="hint">No notes yet.</p>
+  {% endif %}
+  <p><a href="{{ url_for('notes.list_notes', player_id=player.player_id) }}">{% if note_count %}Manage notes{% if note_count > notes|length %} (all {{ note_count }}){% endif %} or add one{% else %}Add a note{% endif %}</a></p>
+</section>
+
+<section>
+  <h2>Compare</h2>
+  <form class="search" method="get" action="{{ url_for('compare.compare') }}">
+    <input type="hidden" name="p1" value="{{ player.player_id }}">
+    <label for="compare-q">Compare with&hellip;</label>
+    <input id="compare-q" name="q" type="search" maxlength="50"
+           placeholder="Another player's name" autocomplete="off">
+    <button type="submit">Find player</button>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}{% if has_war %}{{ chart_scripts() }}{% endif %}{% endblock %}

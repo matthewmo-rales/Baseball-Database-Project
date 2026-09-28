@@ -1,4 +1,5 @@
 import re
+import sqlite3
 
 import pytest
 
@@ -103,3 +104,29 @@ def test_real_db_will_smith_is_two_players():
     body = app.test_client().get("/", query_string={"q": "Will Smith"}).get_data(as_text=True)
     ids = set(re.findall(r'<a href="/player/(\d+)">Will Smith</a>', body))
     assert len(ids) == 2
+
+
+# ---------------------------------------------------------------- result limit
+
+def add_bulk_players(db_path, count):
+    conn = sqlite3.connect(db_path)
+    with conn:
+        conn.executemany("INSERT INTO players (player_id, full_name) VALUES (?, ?)",
+                         [(900100 + i, f"Bulkrow Fixture {i:02d}") for i in range(count)])
+    conn.close()
+
+
+def test_26_matches_show_25_and_the_refine_note(client, test_db_path):
+    add_bulk_players(test_db_path, 26)
+    body = client.get("/", query_string={"q": "bulkrow"}).get_data(as_text=True)
+    assert len(ID_CELL.findall(body)) == 25
+    assert "refine your search" in body
+    assert "Bulkrow Fixture 24" in body and "Bulkrow Fixture 25" not in body
+
+
+def test_exactly_25_matches_show_all_without_the_note(client, test_db_path):
+    add_bulk_players(test_db_path, 25)
+    body = client.get("/", query_string={"q": "bulkrow"}).get_data(as_text=True)
+    assert len(ID_CELL.findall(body)) == 25
+    assert "refine your search" not in body
+    assert "25 matches for" in body

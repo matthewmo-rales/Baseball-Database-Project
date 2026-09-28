@@ -4,6 +4,8 @@
 <h1>Bad request</h1>
 {% if csrf_failed %}
 <p>The form expired or was sent from somewhere else, so nothing was saved. Go back, reload the page, and submit again.</p>
+{% elif message %}
+<p>{{ message }}</p>
 {% else %}
 <p>That request couldn't be understood. Check the address or the values you entered.</p>
 {% endif %}
