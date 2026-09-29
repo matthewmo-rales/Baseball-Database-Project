@@ -4,9 +4,11 @@
 {% block title %}Charts · Baseball Analytics{% endblock %}
 {% block head %}{{ chart_head() }}{% endblock %}
 {% block content %}
+<header class="page-header">
 <h1>Charts</h1>
-<p class="hint">Each chart is drawn from a saved query's own output. Open the query for its full results,
+<p class="lead">Each chart is drawn from a saved query's own output. Open the query for its full results,
   caveats, the SQL that ran, and a season filter where one applies.</p>
+</header>
 
 {% for q in items %}
 <section class="chart-section">
@@ -17,9 +19,12 @@
       hand-built CSV that is not included in the repository (see <code>database/README.md</code>).</p>
   </div>
   {% else %}
-  {{ chart(url_for('queries.chart', slug=q.slug), q.title ~ " chart") }}
+  <div class="chart-panel">
+  {{ chart(url_for('queries.chart', slug=q.slug), q.title ~ " chart",
+           query_chart_title(q.chart, woba_latest_season if q.chart == "woba_leaderboard" else none)) }}
   {% if q.chart == "woba_leaderboard" %}<p class="caption">Latest season shown; the query page has a season selector.</p>{% endif %}
   {{ chart_caption(q.chart) }}
+  </div>
   {% endif %}
 </section>
 {% endfor %}

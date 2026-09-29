@@ -53,7 +53,7 @@ DIVISIONS = [("ALE", "East", "AL"), ("NLC", "Central", "NL"), ("ALW", "West", "A
 TEAMS = [  # (team_id, team_name, city, division_id, fangraphs_abbrev)
     ("TSA", "Fixture Alphas", "Mocktown", "ALE", "TSA"),
     ("TSB", "Fixture Betas", "Mocktown", "ALE", "TSB"),          # shares a city with TSA
-    ("TSD", "Fixture 500 Club", "Fivehundred", "ALW", "TSD"),
+    ("TSD", "Fixture 500 Club", "Fixture", "ALW", "TSD"),        # name starts with its city
     ("TSC", "Fixture 50% Club", "Percent Falls", "ALW", "TSC"),  # literal '%'
     ("TSF", "Fixture QxStars", "Lettertown", "ALC", "TSF"),
     ("TSE", "Fixture Q_Stars", "Underscore Bay", "ALC", "TSE"),  # literal '_'

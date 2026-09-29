@@ -85,12 +85,43 @@ def _baseline_trace(name, series):
     )
 
 
-def _styled(traces, title, xaxis, yaxis, height=440, margin_left=60):
-    """A figure with the shared look: transparent, labeled, no template."""
+# ---------------------------------------------------------------- titles
+# Chart titles are not part of the Plotly layout: templates render them as an
+# HTML heading above the chart (autoescaped, and it wraps at narrow widths).
+# These are Jinja globals (see init_app), so the words live here, next to the
+# figures they describe.
+
+def player_war_title(name):
+    return name + ": WAR per 162 games"
+
+
+def compare_war_title(name1, name2):
+    return f"{name1} vs {name2}: WAR per 162 games"
+
+
+QUERY_CHART_TITLES = {
+    "woba_leaderboard": lambda season: "Top wOBA, qualified hitters, "
+                                       + (str(season) if season is not None else "—"),
+    "payroll_vs_win_pct": lambda season: "Payroll vs win %, "
+                                         + (str(season) if season is not None else "all seasons"),
+    "age_curves": lambda season: "Hitter aging: change in wRC+ into each age (delta method)",
+    "birth_cohorts": lambda season: "Total WAR by birth cohort, 2015–2025",
+}
+
+
+def query_chart_title(name, season=None):
+    """Title of a saved-query chart. season is the season the chart shows
+    (for woba_leaderboard with no filter, the latest season in the output;
+    '—' when there is none)."""
+    return QUERY_CHART_TITLES[name](season)
+
+
+def _styled(traces, xaxis, yaxis, height=440, margin_left=60, margin_right=20, margin_bottom=90):
+    """A figure with the shared look: transparent, labeled, no template.
+    No title (see above); the top margin leaves room for the 2020 note."""
     fig = go.Figure(data=traces)
     fig.update_layout(
         template="none",
-        title={"text": title, "x": 0, "xanchor": "left"},
         font={"family": 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif', "size": 13},
         xaxis={"gridcolor": GRID, "zeroline": False, **xaxis},
         yaxis={"gridcolor": GRID, **yaxis},
@@ -98,15 +129,15 @@ def _styled(traces, title, xaxis, yaxis, height=440, margin_left=60):
         plot_bgcolor=TRANSPARENT,
         hovermode="closest",
         legend={"orientation": "h", "x": 0, "y": -0.2, "yanchor": "top"},
-        margin={"l": margin_left, "r": 20, "t": 80, "b": 90},
+        margin={"l": margin_left, "r": margin_right, "t": 40, "b": margin_bottom},
         height=height,
     )
     return fig
 
 
-def _figure(title, traces, seasons):
+def _figure(traces, seasons):
     fig = _styled(
-        traces, title,
+        traces,
         xaxis={"title": {"text": "Season"}, "dtick": 1},
         yaxis={"title": {"text": "WAR per 162 games"}, "rangemode": "tozero",
                "zeroline": True, "zerolinecolor": ZERO_LINE},
@@ -125,7 +156,7 @@ def player_war_figure(player, series, baseline, baseline_name):
     if baseline and any(r["war162"] is not None for r in baseline):
         traces.append(_baseline_trace(baseline_name, baseline))
     seasons = [r["season_year"] for r in series]
-    return _figure(player["full_name"] + ": WAR per 162 games", traces, seasons)
+    return _figure(traces, seasons)
 
 
 def compare_war_figure(p1, s1, p2, s2):
@@ -134,8 +165,7 @@ def compare_war_figure(p1, s1, p2, s2):
         _player_trace(f"{p2['full_name']} ({p2['player_id']})", s2, SECOND_STYLE),
     ]
     seasons = [r["season_year"] for r in s1] + [r["season_year"] for r in s2]
-    title = f"{p1['full_name']} vs {p2['full_name']}: WAR per 162 games"
-    return _figure(title, traces, seasons)
+    return _figure(traces, seasons)
 
 
 # ---------------------------------------------------------------- saved-query charts
@@ -170,6 +200,7 @@ def woba_leaderboard(result, season=None):
         marker={"color": PLAYER_STYLE["color"]},
         text=[f"{r['woba']:.3f}" for r in rows],
         textposition="outside",
+        cliponaxis=False,       # labels may sit in the right margin (see margin_right below)
         customdata=[[r["woba_rank"], r["name"], r["team"], r["pa"], r["wrc_plus"], r["player_id"]]
                     for r in rows],
         hovertemplate=("%{customdata[1]} (%{customdata[2]})<br>Player ID %{customdata[5]}"
@@ -178,11 +209,12 @@ def woba_leaderboard(result, season=None):
         name="wOBA",
     )
     fig = _styled(
-        [trace], f"Top wOBA, qualified hitters, {season}",
+        [trace],
         xaxis={"title": {"text": "wOBA"}, "rangemode": "tozero"},
         yaxis={"title": {"text": "Hitter (rank order)"}, "tickvals": positions,
                "ticktext": [r["name"] for r in rows], "autorange": "reversed"},
         margin_left=170,
+        margin_right=60,        # room for the longest outside label, e.g. 0.463
     )
     fig.update_layout(showlegend=False)
     return fig
@@ -216,12 +248,17 @@ def payroll_vs_win_pct(result, season=None):
     if short:
         traces.append(trace(short, "2020 (60 games, prorated payroll)", "circle-open",
                             SECOND_STYLE["color"]))
-    scope = str(season) if season is not None else "all seasons"
-    return _styled(
-        traces, f"Payroll vs win %, {scope}",
-        xaxis={"title": {"text": "Payroll relative to that season's league average (1.0 = average)"}},
+    fig = _styled(
+        traces,
+        # Fixed text, no data in it: one fixed break so it fits at phone width.
+        xaxis={"title": {"text": "Payroll relative to that season's<br>league average (1.0 = average)"}},
         yaxis={"title": {"text": "Win %"}},
+        margin_bottom=140,
     )
+    # Legend pinned to the bottom of the figure, clear of the two-line axis
+    # title (it wraps to two rows at phone width).
+    fig.update_layout(legend={"yref": "container", "y": 0, "yanchor": "bottom"})
+    return fig
 
 
 def age_curves(result, season=None):
@@ -251,7 +288,7 @@ def age_curves(result, season=None):
             hovertemplate=hover,
         ))
     return _styled(
-        traces, "Hitter aging: change in wRC+ into each age (delta method)",
+        traces,
         xaxis={"title": {"text": "Age"}, "dtick": 1},
         yaxis={"title": {"text": "Change in wRC+ from the previous age"},
                "zeroline": True, "zerolinecolor": ZERO_LINE},
@@ -271,7 +308,7 @@ def birth_cohorts(result, season=None):
         name="Total WAR",
     )
     fig = _styled(
-        [trace], "Total WAR by birth cohort, 2015–2025",
+        [trace],
         xaxis={"title": {"text": "Birth year (cohort)"}, "dtick": 1},
         yaxis={"title": {"text": "Total WAR, 2015–2025"}, "rangemode": "tozero"},
     )
@@ -359,6 +396,9 @@ def init_app(app):
     app.jinja_env.globals.update(
         plotly_version=plotly.__version__,
         plotly_maplibre_style_id=maplibre_id,
+        player_war_title=player_war_title,
+        compare_war_title=compare_war_title,
+        query_chart_title=query_chart_title,
     )
 
 

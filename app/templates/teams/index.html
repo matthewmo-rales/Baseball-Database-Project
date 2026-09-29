@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{% if searched %}{{ q }} · {% endif %}Teams · Baseball Analytics{% endblock %}
 {% block content %}
-<h1>Teams</h1>
+<header class="page-header">
+  <h1>Teams</h1>
+</header>
 <form class="search" method="get" action="{{ url_for('teams.index') }}" role="search">
   <label for="q">Team name, city or abbreviation</label>
   <input id="q" name="q" type="search" value="{{ q }}" maxlength="{{ max_len }}"
@@ -22,14 +24,20 @@
 {% for league, divisions in leagues %}
 <section>
   <h2>{{ league }}</h2>
-  {% for division, teams in divisions %}
-  <h3>{{ league }} {{ division }}</h3>
-  <ul>
-    {% for t in teams %}
-    <li><a href="{{ url_for('teams.team', team_id=t.team_id) }}">{{ t.team_name }}</a> <span class="mono">{{ t.team_id }}</span></li>
+  <div class="division-grid">
+    {% for division, teams in divisions %}
+    <section class="division">
+      <h3>{{ league }} {{ division }}</h3>
+      <ul class="team-list">
+        {% for t in teams %}
+        <li><span class="badge mono">{{ t.team_id }}</span> <a href="{{ url_for('teams.team', team_id=t.team_id) }}">{{ t.team_name }}</a>
+          {#- The city only when the name doesn't already start with it ("Seattle Mariners"). #}
+          {%- if t.city and not t.team_name.startswith(t.city ~ " ") %} <span class="team-city">{{ t.city }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </section>
     {% endfor %}
-  </ul>
-  {% endfor %}
+  </div>
 </section>
 {% endfor %}
 {% endblock %}

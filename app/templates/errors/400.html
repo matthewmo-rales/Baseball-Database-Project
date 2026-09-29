@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Bad request · Baseball Analytics{% endblock %}
 {% block content %}
+<header class="page-header">
 <h1>Bad request</h1>
+</header>
+<div class="box">
 {% if csrf_failed %}
 <p>The form expired or was sent from somewhere else, so nothing was saved. Go back, reload the page, and submit again.</p>
 {% elif message %}
@@ -10,4 +13,5 @@
 <p>That request couldn't be understood. Check the address or the values you entered.</p>
 {% endif %}
 <p><a href="{{ url_for('main.index') }}">Back to player search</a></p>
+</div>
 {% endblock %}

@@ -1,5 +1,5 @@
 {# Compact player header for the notes pages. Expects: player. #}
-<header class="player-header">
+<header class="page-header player-header">
   <h1><a href="{{ url_for('players.player', player_id=player.player_id) }}">{{ player.full_name }}</a></h1>
   <p class="player-meta">
     Player ID <span class="mono">{{ player.player_id }}</span>

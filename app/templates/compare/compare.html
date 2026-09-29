@@ -23,7 +23,9 @@
 {%- endmacro %}
 
 {% block content %}
-<h1>{{ a.player.full_name }} vs {{ b.player.full_name }}</h1>
+<header class="page-header">
+  <h1>{{ a.player.full_name }} vs {{ b.player.full_name }}</h1>
+</header>
 
 <div class="table-scroll">
 <table class="results stats compare">
@@ -88,13 +90,15 @@
 </p>
 
 <section class="chart-section" id="war-chart">
-  <h2>WAR per 162 games</h2>
+  <div class="chart-panel">
   {{ chart(url_for('compare.war_chart', p1=p1, p2=p2),
-           "Line chart comparing " ~ a.player.full_name ~ " and " ~ b.player.full_name ~ " by WAR per 162 games") }}
+           "Line chart comparing " ~ a.player.full_name ~ " and " ~ b.player.full_name ~ " by WAR per 162 games",
+           compare_war_title(a.player.full_name, b.player.full_name), level=2) }}
   <p class="caption">Batting plus pitching WAR, scaled to a 162-game season (WAR &times; 162 &divide; scheduled games).
     Solid line with circles: {{ a.player.full_name }}. Dotted line with squares: {{ b.player.full_name }}.</p>
+  </div>
 </section>
 
-<p><a href="{{ url_for('compare.compare', p1=p1) }}">Compare {{ a.player.full_name }} with someone else</a></p>
+<p class="back-link"><a href="{{ url_for('compare.compare', p1=p1) }}">Compare {{ a.player.full_name }} with someone else</a></p>
 {% endblock %}
 {% block scripts %}{{ chart_scripts() }}{% endblock %}

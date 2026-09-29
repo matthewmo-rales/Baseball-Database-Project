@@ -6,5 +6,5 @@
 {% with action=url_for('notes.edit_note', note_id=note.note_id), submit_label="Save changes" %}
   {% include "notes/_form.html" %}
 {% endwith %}
-<p><a href="{{ url_for('notes.list_notes', player_id=note.player_id) }}">Cancel, back to notes</a></p>
+<p class="back-link"><a href="{{ url_for('notes.list_notes', player_id=note.player_id) }}">Cancel, back to notes</a></p>
 {% endblock %}

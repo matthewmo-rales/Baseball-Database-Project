@@ -164,9 +164,13 @@ def show(slug):
     if query.chart:
         ctx["chart_src_args"] = {"slug": slug, **({"season": season} if season else {})}
         if query.chart == "woba_leaderboard" and season is None and result.rows:
-            ctx["chart_default_season"] = max(r[queries.season_column(result.columns)]
-                                              for r in result.rows)
+            ctx["chart_default_season"] = _latest_season(result)
     return render_template("query/show.html", **ctx)
+
+
+def _latest_season(result):
+    """The latest season in a result: the season an unfiltered wOBA chart shows."""
+    return max(r[queries.season_column(result.columns)] for r in result.rows)
 
 
 @bp.route("/query/<slug>/chart.json")
@@ -190,7 +194,15 @@ def gallery():
     db = get_ro_db()
     loaded, _total = stats.payroll_coverage(db)
     items = [q for q in sorted(_saved().values(), key=queries._file_order) if q.chart]
-    return render_template("query/charts.html", items=items, payroll_loaded=loaded)
+    # The wOBA chart's title names the season it shows: the latest in Q01's output.
+    woba_latest_season = None
+    woba = next((q for q in items if q.chart == "woba_leaderboard"), None)
+    if woba is not None:
+        result = queries.execute(db, woba.sql, ())
+        if result.rows:
+            woba_latest_season = _latest_season(result)
+    return render_template("query/charts.html", items=items, payroll_loaded=loaded,
+                           woba_latest_season=woba_latest_season)
 
 
 def _link_columns(columns):

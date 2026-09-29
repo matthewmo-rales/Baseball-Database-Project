@@ -1,14 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{% if q %}{{ q }} · {% endif %}Player search · Baseball Analytics{% endblock %}
 {% block content %}
-<h1>Player search</h1>
+<header class="page-header">
+  <h1>Baseball Analytics</h1>
+  <p class="lead">Season-level MLB batting, pitching and team data, with the analysis queries and charts built on it.</p>
+</header>
+
+<h2>Player search</h2>
 <form class="search" method="get" action="{{ url_for('main.index') }}" role="search">
   <label for="q">Player name</label>
   <input id="q" name="q" type="search" value="{{ q }}" maxlength="{{ max_len }}"
-         placeholder="e.g. jose ramirez" autocomplete="off" autofocus>
+         placeholder="e.g. jose ramirez" autocomplete="off">
   <button type="submit">Search</button>
 </form>
-<p><a href="{{ url_for('teams.index') }}">Browse teams</a></p>
 
 {% if message %}
   <p class="notice">{{ message }}</p>
@@ -21,6 +25,7 @@
         {{ results|length }} match{{ "es" if results|length != 1 }} for &ldquo;{{ q }}&rdquo;.
       {%- endif %}
     </p>
+    <div class="table-scroll">
     <table class="results">
       <thead>
         <tr>
@@ -50,9 +55,23 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     <p class="hint">Some names belong to more than one player. The ID column tells them apart.</p>
   {% else %}
     <p class="notice">No players match &ldquo;{{ q }}&rdquo;.</p>
   {% endif %}
 {% endif %}
+
+<nav aria-label="Sections">
+  <ul class="section-cards">
+    <li><a href="{{ url_for('main.index') }}#q"><span class="card-title">Player search</span>
+      <span class="card-desc">Find a player by name and open their season-by-season batting, pitching and WAR chart.</span></a></li>
+    <li><a href="{{ url_for('teams.index') }}"><span class="card-title">Teams</span>
+      <span class="card-desc">Browse franchises by league and division, with season results and single-team rosters.</span></a></li>
+    <li><a href="{{ url_for('queries.index') }}"><span class="card-title">Saved queries</span>
+      <span class="card-desc">Run the analysis queries and read each one's question, caveats, results and exact SQL.</span></a></li>
+    <li><a href="{{ url_for('queries.gallery') }}"><span class="card-title">Charts</span>
+      <span class="card-desc">See the charts drawn from saved-query output, each with its caption and caveats.</span></a></li>
+  </ul>
+</nav>
 {% endblock %}

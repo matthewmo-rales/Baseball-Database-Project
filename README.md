@@ -91,7 +91,7 @@ The app is a local demo, but it handles user input on every page and writes to t
 pytest
 ```
 
-484 tests, about a minute. They run against a small fictional database built from `design/schema.sql`, so they don't need the real one; the 2 tests that check the real database are skipped when it hasn't been built. The suite covers the saved-query parser and every query's row count, the charts and their data, player, season, compare and team pages, search, the notes CRUD flow, the loader's atomic rebuild and note carry-over, and the security controls above, including route fuzzing and the static SQL check.
+489 tests, about a minute. They run against a small fictional database built from `design/schema.sql`, so they don't need the real one; the 2 tests that check the real database are skipped when it hasn't been built. The suite covers the saved-query parser and every query's row count, the charts and their data, player, season, compare and team pages, search, the notes CRUD flow, the loader's atomic rebuild and note carry-over, and the security controls above, including route fuzzing and the static SQL check.
 
 ## Setup
 

@@ -71,7 +71,9 @@ def test_axis_titles_title_and_transparent_background(client):
     layout = f["layout"]
     assert layout["xaxis"]["title"]["text"] == "Season"
     assert layout["yaxis"]["title"]["text"] == "WAR per 162 games"
-    assert "Hank Baseline" in layout["title"]["text"]
+    assert "title" not in layout                  # the page renders the title as HTML
+    page = client.get(f"/player/{HANK}").get_data(as_text=True)
+    assert '<h2 class="chart-title">Hank Baseline: WAR per 162 games</h2>' in page
     assert layout["paper_bgcolor"] == layout["plot_bgcolor"] == "rgba(0, 0, 0, 0)"
 
 
@@ -140,8 +142,22 @@ def test_compare_chart_has_two_distinguishable_lines_and_no_baseline(client):
     assert (first["line"]["dash"], first["marker"]["symbol"]) == ("solid", "circle")
     assert (second["line"]["dash"], second["marker"]["symbol"]) == ("dot", "square")
     assert second["line"]["color"] == "#D55E00"
-    assert "Hank Baseline" in f["layout"]["title"]["text"] and "Jules Doubleplay" in f["layout"]["title"]["text"]
+    assert "title" not in f["layout"]
     assert SHORT_SEASON_TEXT in annotations(f)    # Hank's range reaches 2020
+    page = client.get(f"/compare?p1={HANK}&p2={JULES}").get_data(as_text=True)
+    assert ('<h2 class="chart-title">Hank Baseline vs Jules Doubleplay: WAR per 162 games</h2>'
+            in page)
+
+
+def test_chart_title_from_player_name_is_escaped(client, test_db_path):
+    conn = sqlite3.connect(test_db_path)
+    with conn:
+        conn.execute("UPDATE players SET full_name = 'Hank <b>Baseline</b>' WHERE player_id = ?", (HANK,))
+    conn.close()
+    page = client.get(f"/compare?p1={HANK}&p2={JULES}").get_data(as_text=True)
+    assert ('<h2 class="chart-title">Hank &lt;b&gt;Baseline&lt;/b&gt; vs Jules Doubleplay: '
+            'WAR per 162 games</h2>') in page
+    assert "<b>Baseline</b>" not in page
 
 
 @pytest.mark.parametrize("query, status", [

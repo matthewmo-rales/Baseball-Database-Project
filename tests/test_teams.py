@@ -163,8 +163,19 @@ def test_teams_lists_every_team_grouped_and_ordered(client, test_db_path):
     assert team_sections(body) == FIXTURE_ORDER
     db_ids = {r[0] for r in query_db(test_db_path, "SELECT team_id FROM teams")}
     assert set(TEAM_LINK.findall(body)) == db_ids
-    assert '<a href="/team/TSA">Fixture Alphas</a> <span class="mono">TSA</span>' in body
+    assert '<span class="badge mono">TSA</span> <a href="/team/TSA">Fixture Alphas</a>' in body
     assert "match" not in body                       # no count line without a search
+
+
+def test_team_list_row_shows_city_unless_name_starts_with_it(client):
+    body = teams_page(client).get_data(as_text=True)
+    assert ('<span class="badge mono">TSG</span> <a href="/team/TSG">Fixture Gammas</a>'
+            ' <span class="team-city">Tsarville</span></li>') in body
+    # TSD's city is "Fixture" and its name is "Fixture 500 Club": no repeat.
+    assert '<a href="/team/TSD">Fixture 500 Club</a></li>' in body
+    assert '<span class="team-city">Fixture</span>' not in body
+    # Display only: search still matches on city (Tsarville is in no name).
+    assert teams_page(client, "tsarville", 302).headers["Location"] == "/team/TSG"
 
 
 def test_partial_name_match_redirects(client):

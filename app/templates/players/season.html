@@ -25,10 +25,10 @@
 {%- endmacro %}
 
 {% block content %}
-{% include "players/_header.html" %}
 <p class="breadcrumb">
   <a href="{{ url_for('players.player', player_id=player.player_id) }}">&larr; All seasons</a>
 </p>
+{% include "players/_header.html" %}
 <h2 class="season-title">{{ season.season_year }} season</h2>
 
 {% if season.is_shortened %}

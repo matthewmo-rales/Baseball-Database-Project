@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Page not found · Baseball Analytics{% endblock %}
 {% block content %}
+<header class="page-header">
 <h1>Page not found</h1>
+</header>
+<div class="box">
 {% if message %}
 <p>{{ message }}</p>
 {% else %}
 <p>There's nothing at this address. The player, team or season may not exist in the 2015&ndash;2025 data.</p>
 {% endif %}
 <p><a href="{{ url_for('main.index') }}">Back to player search</a></p>
+</div>
 {% endblock %}

@@ -12,9 +12,10 @@
 
 {% if has_war %}
 <section class="chart-section" id="war-chart">
-  <h2>WAR per 162 games</h2>
+  <div class="chart-panel">
   {{ chart(url_for('players.war_chart', player_id=player.player_id),
-           "Line chart of " ~ player.full_name ~ "'s WAR per 162 games by season") }}
+           "Line chart of " ~ player.full_name ~ "'s WAR per 162 games by season",
+           player_war_title(player.full_name), level=2) }}
   <p class="caption">
     Batting plus pitching WAR, scaled to a 162-game season (WAR &times; 162 &divide; scheduled games).
     {% if baseline_kind == "hitter" %}
@@ -32,6 +33,7 @@
       {{ player.primary_position or "no position" }}.
     {% endif %}
   </p>
+  </div>
 </section>
 {% endif %}
 

@@ -18,7 +18,10 @@
 <script src="{{ url_for('static', filename='js/charts.js') }}" defer></script>
 {%- endmacro %}
 
-{% macro chart(src, label) -%}
+{# title: the chart's heading, rendered here (autoescaped) rather than in the
+   Plotly layout so it wraps at narrow widths. level: its heading level. #}
+{% macro chart(src, label, title, level=3) -%}
+<h{{ level }} class="chart-title">{{ title }}</h{{ level }}>
 <div class="chart" data-chart-src="{{ src }}" role="figure" aria-label="{{ label }}">
   <p class="chart-loading">Loading chart&hellip;</p>
 </div>

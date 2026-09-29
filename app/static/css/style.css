@@ -314,10 +314,91 @@ button:hover { background: var(--accent-hover); border-color: var(--accent-hover
 .caption { color: var(--muted); font-size: 0.85rem; margin-top: var(--space-2); }
 
 /* ---- page furniture ---- */
+/* Every page opens with .page-header: optional breadcrumb, h1, meta line. */
+.page-header {
+  margin: 0 0 var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.page-header h1 { margin: 0; }
+.page-header .player-meta, .page-header .lead { margin: var(--space-1) 0 0; }
+.page-header .caption { margin: var(--space-1) 0 0; }
 .breadcrumb { margin: 0 0 var(--space-2); font-size: 0.85rem; color: var(--muted); }
 .player-header h1 { margin-bottom: var(--space-1); }
 .player-meta { margin: 0 0 var(--space-4); color: var(--muted); }
-.season-title { font-size: 1.3rem; margin-top: var(--space-2); }
+.lead { color: var(--muted); max-width: 72ch; }
+.season-title { font-size: 1.3rem; margin: 0 0 var(--space-3); }
+.back-link { margin: var(--space-4) 0 0; font-size: 0.9rem; }
+
+/* Home: section cards. The whole card is the link. */
+.section-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.section-cards a {
+  display: block;
+  height: 100%;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.section-cards a:hover { border-color: var(--accent); background: var(--raised); }
+.card-title { display: block; margin-bottom: var(--space-1); font-weight: 700; color: var(--accent); }
+.card-desc { display: block; color: var(--muted); font-size: 0.9rem; }
+
+/* Teams: divisions side by side at desktop, stacked on narrow screens. */
+.division-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.division {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.division h3 { margin: var(--space-1) 0 var(--space-2); color: var(--muted); font-size: 0.85rem; }
+.team-list { list-style: none; margin: 0; padding: 0; }
+.team-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.team-list li:first-child { border-top: 0; }
+.team-city { color: var(--muted); font-size: 0.85rem; }
+.badge {
+  display: inline-block;
+  min-width: 3.4em;
+  padding: 0 var(--space-1);
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* Section blocks that group related content (query metadata, SQL, errors). */
+.box {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.box > :first-child { margin-top: 0; }
+.box > :last-child { margin-bottom: 0; }
 
 .stat-grid {
   display: grid;
@@ -362,33 +443,58 @@ button:hover { background: var(--accent-hover); border-color: var(--accent-hover
 .note-actions form { margin: 0; }
 .notes-panel .note-body { margin-bottom: 0; }
 
-/* ---- charts ---- */
-.chart {
-  min-height: 440px;
-  padding: var(--space-2);
+/* ---- charts ----
+   .chart-panel frames a chart and the captions that belong to it. */
+.chart-panel {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2) var(--space-3) var(--space-3);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+/* An h2 chart title keeps the section-heading size from the h2 rule. */
+.chart-panel > .chart-title { margin: var(--space-2) 0; overflow-wrap: anywhere; }
+.chart-panel > h3.chart-title { font-size: 0.95rem; }
+.chart { min-height: 440px; }
+.chart-panel > .caption, .chart-panel > .notice { margin: var(--space-2) 0 0; }
+.chart-panel > .notice + .caption { margin-top: var(--space-2); }
 .chart-loading, .chart-failed { color: var(--muted); padding: var(--space-4) 0; margin: 0; }
 
 /* ---- saved queries ---- */
-.query-list { list-style: none; margin: 0; padding: 0; }
-.query-list li { padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
+.query-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.query-list li { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); }
+.query-list li:first-child { border-top: 0; }
+.query-list li:hover { background: var(--row-hover); }
 .query-question { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
-.query-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px var(--space-4); margin: 0 0 var(--space-4); }
-.query-meta dt { font-weight: 600; }
+.query-meta { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0 0 var(--space-4); }
+.query-meta dt { font-weight: 600; color: var(--muted); font-size: 0.85rem; padding-top: 1px; }
 .query-meta dd { margin: 0; }
+.query-links { padding-left: 20px; }
+.query-links li { margin: 2px 0; }
 .season-choices { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); list-style: none; margin: 0; padding: 0; }
 .sql { font-size: 0.85rem; line-height: 1.45; }
 .bound ul { margin: 0 0 var(--space-2); padding-left: 20px; }
 
 /* ---- small screens ---- */
+@media (max-width: 900px) {
+  .division-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 560px) {
   .results th, .results td { padding: 6px; }
   .query-meta { grid-template-columns: 1fr; }
   .query-meta dd { margin-bottom: 6px; }
-  .chart { min-height: 360px; padding: 0; border-width: 1px 0; border-radius: 0; }
+  .chart { min-height: 360px; }
+  .chart-panel { padding: var(--space-1) 0 var(--space-2); border-width: 1px 0; border-radius: 0; }
+  .chart-panel > .caption, .chart-panel > .notice,
+  .chart-panel > .chart-title { margin-left: var(--space-2); margin-right: var(--space-2); }
+  .box { padding: var(--space-3); }
 }
 
 @media (prefers-reduced-motion: reduce) {

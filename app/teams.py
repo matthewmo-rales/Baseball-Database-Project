@@ -21,7 +21,7 @@ TEAM_ID_RE = re.compile(r"[A-Z]{2,4}")
 # League and division come through divisions; East/Central/West order is
 # derived from division_name, never from division ids.
 TEAM_LIST_SELECT = """
-SELECT t.team_id, t.team_name, d.league, d.division_name
+SELECT t.team_id, t.team_name, t.city, d.league, d.division_name
   FROM teams     AS t
   JOIN divisions AS d ON d.division_id = t.division_id
 """

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ team.team_name }} · Baseball Analytics{% endblock %}
 {% block content %}
-<header class="player-header">
+<header class="page-header player-header">
   <h1>{{ team.team_name }}</h1>
   <p class="player-meta">
     {% if team.city %}{{ team.city }} · {% endif %}{{ team.league }} {{ team.division_name }}

@@ -1,17 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Compare{% if player %} {{ player.full_name }}{% endif %} · Baseball Analytics{% endblock %}
 {% block content %}
+<header class="page-header">
 {% if player %}
 <h1>Compare {{ player.full_name }} <span class="count mono">({{ player.player_id }})</span> with&hellip;</h1>
 {% else %}
 <h1>Compare two players</h1>
 {% endif %}
+</header>
 <form class="search" method="get" action="{{ url_for('compare.compare') }}" role="search">
   {% if player %}<input type="hidden" name="p1" value="{{ player.player_id }}">{% endif %}
   {% if other_id %}<input type="hidden" name="p2" value="{{ other_id }}">{% endif %}
   <label for="q">{% if player %}Second player's name{% else %}First player's name{% endif %}</label>
   <input id="q" name="q" type="search" value="{{ search.q }}" maxlength="{{ max_len }}"
-         placeholder="e.g. aaron judge" autocomplete="off" autofocus>
+         placeholder="e.g. aaron judge" autocomplete="off">
   <button type="submit">Search</button>
 </form>
 
@@ -26,6 +28,7 @@
         {{ search.results|length }} match{{ "es" if search.results|length != 1 }} for &ldquo;{{ search.q }}&rdquo;.
       {%- endif %}
     </p>
+    <div class="table-scroll">
     <table class="results">
       <thead>
         <tr>
@@ -53,9 +56,10 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% else %}
     <p class="notice">No other players match &ldquo;{{ search.q }}&rdquo;.</p>
   {% endif %}
 {% endif %}
-{% if player %}<p><a href="{{ url_for('players.player', player_id=player.player_id) }}">&larr; Back to {{ player.full_name }}</a></p>{% endif %}
+{% if player %}<p class="back-link"><a href="{{ url_for('players.player', player_id=player.player_id) }}">&larr; Back to {{ player.full_name }}</a></p>{% endif %}
 {% endblock %}

@@ -41,7 +41,7 @@ def test_woba_chart_defaults_to_latest_season_and_matches_q01(app, client, test_
     f = fig(client, "/query/top-woba-by-season/chart.json")
     (bar,) = f["data"]
     assert bar["type"] == "bar" and bar["orientation"] == "h"
-    assert f["layout"]["title"]["text"] == "Top wOBA, qualified hitters, 2020"
+    assert "title" not in f["layout"]              # the page renders the title as HTML
     assert f["layout"]["yaxis"]["ticktext"] == [r["name"] for r in rows]
     assert bar["x"] == [r["woba"] for r in rows]
     assert [c[0] for c in bar["customdata"]] == [r["woba_rank"] for r in rows]
@@ -143,8 +143,27 @@ def test_birth_cohort_chart_matches_q10(app, client, test_db_path):
     assert bar["x"] == [r["birth_year"] for r in rows]
     assert bar["y"] == [r["total_war"] for r in rows]
     assert [c[0] for c in bar["customdata"]] == [r["avg_war_per_player"] for r in rows]
-    assert "birth cohort" in f["layout"]["title"]["text"]
+    assert "title" not in f["layout"]
     assert "draft" not in json.dumps(f).lower()
+
+
+def test_chart_titles_render_as_html_headings(client):
+    query_page = client.get("/query/top-woba-by-season").get_data(as_text=True)
+    assert '<h2 class="chart-title">Top wOBA, qualified hitters, 2020</h2>' in query_page
+    gallery = client.get("/charts").get_data(as_text=True)
+    for title in ("Top wOBA, qualified hitters, 2020",           # latest season in Q01's output
+                  "Hitter aging: change in wRC+ into each age (delta method)",
+                  "Total WAR by birth cohort, 2015–2025"):
+        assert f'<h3 class="chart-title">{html.escape(title)}</h3>' in gallery
+
+
+def test_woba_title_without_a_season_uses_the_missing_value_dash():
+    assert charts.query_chart_title("woba_leaderboard") == "Top wOBA, qualified hitters, —"
+    assert charts.query_chart_title("woba_leaderboard", 2020) == "Top wOBA, qualified hitters, 2020"
+
+
+def test_every_query_chart_has_a_title():
+    assert set(charts.QUERY_CHART_TITLES) == set(charts.QUERY_CHARTS)
 
 
 def test_birth_cohort_truncation_caption_is_prominent(client):

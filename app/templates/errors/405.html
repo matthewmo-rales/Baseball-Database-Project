@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Not allowed · Baseball Analytics{% endblock %}
 {% block content %}
+<header class="page-header">
 <h1>That action isn't available here</h1>
+</header>
+<div class="box">
 <p>This address doesn't accept that kind of request. Changes such as deleting a note have to be made with the buttons on the page.</p>
 <p><a href="{{ url_for('main.index') }}">Back to player search</a></p>
+</div>
 {% endblock %}
