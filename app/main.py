@@ -60,15 +60,24 @@ def like_pattern(raw):
     return "%" + escaped + "%"
 
 
+def length_problem(q):
+    """Notice for a stripped, non-blank query outside the length limits, else None.
+    Shared by player search and team search."""
+    if len(q) < MIN_QUERY_LEN:
+        return f"Enter at least {MIN_QUERY_LEN} characters."
+    if len(q) > MAX_QUERY_LEN:
+        return f"Search is limited to {MAX_QUERY_LEN} characters."
+    return None
+
+
 def search_players(raw_q, exclude_id=None):
     """Validate and run a name search. Shared by / and the compare picker."""
     q = (raw_q or "").strip()
     if not q:
         return Search(q, None, None, False)
-    if len(q) < MIN_QUERY_LEN:
-        return Search(q, None, f"Enter at least {MIN_QUERY_LEN} characters.", False)
-    if len(q) > MAX_QUERY_LEN:
-        return Search(q, None, f"Search is limited to {MAX_QUERY_LEN} characters.", False)
+    message = length_problem(q)
+    if message:
+        return Search(q, None, message, False)
     rows = get_ro_db().execute(
         SEARCH_SQL, (like_pattern(q), exclude_id, RESULT_LIMIT + 1)
     ).fetchall()

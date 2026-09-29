@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{% if searched %}{{ q }} · {% endif %}Teams · Baseball Analytics{% endblock %}
+{% block content %}
+<h1>Teams</h1>
+<form class="search" method="get" action="{{ url_for('teams.index') }}" role="search">
+  <label for="q">Team name, city or abbreviation</label>
+  <input id="q" name="q" type="search" value="{{ q }}" maxlength="{{ max_len }}"
+         placeholder="e.g. sea" autocomplete="off">
+  <button type="submit">Search</button>
+</form>
+
+{% if message %}
+  <p class="notice">{{ message }}</p>
+{% elif searched %}
+  {% if count %}
+    <p class="result-count">{{ count }} match{{ "es" if count != 1 }} for &ldquo;{{ q }}&rdquo;.</p>
+  {% else %}
+    <p class="notice">No teams match &ldquo;{{ q }}&rdquo;. <a href="{{ url_for('teams.index') }}">Show all teams</a></p>
+  {% endif %}
+{% endif %}
+
+{% for league, divisions in leagues %}
+<section>
+  <h2>{{ league }}</h2>
+  {% for division, teams in divisions %}
+  <h3>{{ league }} {{ division }}</h3>
+  <ul>
+    {% for t in teams %}
+    <li><a href="{{ url_for('teams.team', team_id=t.team_id) }}">{{ t.team_name }}</a> <span class="mono">{{ t.team_id }}</span></li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+</section>
+{% endfor %}
+{% endblock %}

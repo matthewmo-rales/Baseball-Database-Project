@@ -8,6 +8,7 @@
          placeholder="e.g. jose ramirez" autocomplete="off" autofocus>
   <button type="submit">Search</button>
 </form>
+<p><a href="{{ url_for('teams.index') }}">Browse teams</a></p>
 
 {% if message %}
   <p class="notice">{{ message }}</p>

@@ -7,6 +7,7 @@ import pytest
 from app import CSP
 from app import queries as Q
 from app import stats as stats_module
+from tests.conftest import query_db
 
 HANK, KURT, MOE = 900010, 900013, 900015
 
@@ -122,3 +123,160 @@ def test_player_page_team_links_resolve(client):
 
 def test_team_page_csp_is_strict(client):
     assert client.get("/team/TSA").headers["Content-Security-Policy"] == CSP
+
+
+# ---------------------------------------------------------------- /teams
+
+TEAM_LINK = re.compile(r'<a href="/team/(TS[A-Z])">')
+FIXTURE_ORDER = [  # AL East, AL Central, AL West, NL Central; names alphabetical
+    ("AL", "East", ["TSA", "TSB"]),
+    ("AL", "Central", ["TSE", "TSF"]),     # Fixture Q_Stars < Fixture QxStars
+    ("AL", "West", ["TSC", "TSD"]),        # Fixture 50% Club < Fixture 500 Club
+    ("NL", "Central", ["TSG"]),
+]
+
+
+def team_sections(body):
+    """{(league, division): [team ids]} in page order, from the h2/h3 headings."""
+    out, league = [], None
+    for m in re.finditer(r"<h2>([^<]+)</h2>|<h3>([^<]+)</h3>|" + TEAM_LINK.pattern, body):
+        if m.group(1):
+            league = m.group(1)
+        elif m.group(2):
+            lg, division = m.group(2).split(" ", 1)
+            assert lg == league
+            out.append((league, division, []))
+        else:
+            out[-1][2].append(m.group(3))
+    return out
+
+
+def teams_page(client, q=None, status=200):
+    resp = client.get("/teams", query_string={"q": q} if q is not None else {})
+    assert resp.status_code == status, q
+    return resp
+
+
+def test_teams_lists_every_team_grouped_and_ordered(client, test_db_path):
+    body = teams_page(client).get_data(as_text=True)
+    assert "<h1>Teams</h1>" in body
+    assert team_sections(body) == FIXTURE_ORDER
+    db_ids = {r[0] for r in query_db(test_db_path, "SELECT team_id FROM teams")}
+    assert set(TEAM_LINK.findall(body)) == db_ids
+    assert '<a href="/team/TSA">Fixture Alphas</a> <span class="mono">TSA</span>' in body
+    assert "match" not in body                       # no count line without a search
+
+
+def test_partial_name_match_redirects(client):
+    resp = teams_page(client, "alph", 302)
+    assert resp.headers["Location"] == "/team/TSA"
+
+
+def test_city_match_redirects(client):
+    assert teams_page(client, "underscore", 302).headers["Location"] == "/team/TSE"
+
+
+def test_lowercase_abbreviation_redirects_to_uppercase_id(client):
+    assert teams_page(client, "tsg", 302).headers["Location"] == "/team/TSG"
+    assert teams_page(client, " tsb ", 302).headers["Location"] == "/team/TSB"
+
+
+def test_exact_abbreviation_wins_over_name_and_city_matches(client):
+    """'tsa' is TSA's id and also inside TSG's city, Tsarville. Real case: 'lad'
+    is inside 'Philadelphia'."""
+    for q in ("tsa", "TSA", " Tsa "):
+        assert teams_page(client, q, 302).headers["Location"] == "/team/TSA"
+    assert teams_page(client, "tsar", 302).headers["Location"] == "/team/TSG"   # not an id: substring
+
+
+def test_abbreviation_is_exact_not_substring(client):
+    body = teams_page(client, "sb").get_data(as_text=True)      # inside TSB, in no name or city
+    assert "No teams match" in body
+
+
+def test_shared_city_lists_both_teams(client):
+    body = teams_page(client, "mocktown").get_data(as_text=True)
+    assert "2 matches for &ldquo;mocktown&rdquo;." in body
+    assert team_sections(body) == [("AL", "East", ["TSA", "TSB"])]
+
+
+def test_multi_match_keeps_grouping(client):
+    body = teams_page(client, "fixture").get_data(as_text=True)
+    assert "7 matches for &ldquo;fixture&rdquo;." in body
+    assert team_sections(body) == FIXTURE_ORDER
+
+
+def test_no_match_notice_links_back(client):
+    body = teams_page(client, "zzz").get_data(as_text=True)
+    assert "No teams match &ldquo;zzz&rdquo;." in body
+    assert '<a href="/teams">Show all teams</a>' in body
+    assert not TEAM_LINK.findall(body)
+
+
+@pytest.mark.parametrize("q, expected", [
+    ("0%", "/team/TSC"),      # a wildcard would also match "Fixture 500 Club"
+    ("q_", "/team/TSE"),      # a wildcard would also match "Fixture QxStars"
+    ("０％", "/team/TSC"),     # fullwidth, normalized before escaping
+    ("ｑ＿", "/team/TSE"),
+])
+def test_percent_and_underscore_match_literally(client, q, expected):
+    assert teams_page(client, q, 302).headers["Location"] == expected
+
+
+@pytest.mark.parametrize("q", ["\\%", "\\_", "\\\\"])
+def test_backslash_matches_literally(client, q):
+    # unescaped, "\%" and "\_" would match the 50% and Q_ teams
+    body = teams_page(client, q).get_data(as_text=True)
+    assert "No teams match" in body
+
+
+@pytest.mark.parametrize("q", ["", "   ", "\t"])
+def test_blank_query_shows_full_list(client, q):
+    body = teams_page(client, q).get_data(as_text=True)
+    assert team_sections(body) == FIXTURE_ORDER
+    assert "notice" not in body
+
+
+@pytest.mark.parametrize("q, message", [
+    ("m", "Enter at least 2 characters."),
+    ("x" * 51, "Search is limited to 50 characters."),
+])
+def test_bad_length_shows_notice_then_full_list(client, monkeypatch, q, message):
+    from app import teams
+    monkeypatch.setattr(teams, "SEARCH_TEAMS_SQL", "SELECT forbidden")   # no search SQL runs
+    body = teams_page(client, q).get_data(as_text=True)
+    assert f'<p class="notice">{message}</p>' in body
+    assert team_sections(body) == FIXTURE_ORDER
+
+
+def test_search_box_matches_player_search_limits(client):
+    body = teams_page(client).get_data(as_text=True)
+    assert 'role="search"' in body and 'method="get"' in body
+    assert '<label for="q">Team name, city or abbreviation</label>' in body
+    assert 'maxlength="50"' in body
+
+
+def test_redirect_uses_db_id_not_input(client):
+    """Location comes from the row, so input casing or padding never leaks in."""
+    for q in ("Tsa", "tSa", "FIXTURE ALPHAS", "fixture alphas "):
+        loc = teams_page(client, q, 302).headers["Location"]
+        assert loc == "/team/TSA"
+
+
+def test_every_redirect_is_a_same_host_team_path(client):
+    for q in ("alph", "tsg", "0%", "q_", "gammas", "percent falls", "tsarville"):
+        loc = teams_page(client, q, 302).headers["Location"]
+        assert re.fullmatch(r"/team/[A-Z]{2,4}", loc), loc
+        assert client.get(loc).status_code == 200
+
+
+def test_team_page_still_rejects_lowercase(client):
+    assert client.get("/team/tsa").status_code == 404
+
+
+def test_nav_and_index_link_to_teams(client):
+    body = client.get("/").get_data(as_text=True)
+    nav = body[body.index('<nav class="site-nav"'):body.index("</nav>")]
+    assert nav.index(">Player search<") < nav.index('href="/teams">Teams<')
+    form_end = body.index("</form>")
+    assert body.index('<a href="/teams">', form_end) > form_end

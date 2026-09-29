@@ -47,10 +47,17 @@ PITCHING = [  # (player_id, season_year, outs_recorded)
 # Fictional players with full stat lines for the player, season, compare and
 # chart tests. Qualified = PA >= 3.1 * games (503 in 162, 186 in 60) and
 # outs >= 3 * games (486 in 162, 180 in 60).
-DIVISIONS = [("ALE", "East", "AL")]
-TEAMS = [  # (team_id, team_name, division_id, fangraphs_abbrev)
-    ("TSA", "Fixture Alphas", "ALE", "TSA"),
-    ("TSB", "Fixture Betas", "ALE", "TSB"),
+# Inserted out of display order, so /teams must sort AL before NL and
+# East, Central, West within a league. TSC-TSG have no stat rows.
+DIVISIONS = [("ALE", "East", "AL"), ("NLC", "Central", "NL"), ("ALW", "West", "AL"), ("ALC", "Central", "AL")]
+TEAMS = [  # (team_id, team_name, city, division_id, fangraphs_abbrev)
+    ("TSA", "Fixture Alphas", "Mocktown", "ALE", "TSA"),
+    ("TSB", "Fixture Betas", "Mocktown", "ALE", "TSB"),          # shares a city with TSA
+    ("TSD", "Fixture 500 Club", "Fivehundred", "ALW", "TSD"),
+    ("TSC", "Fixture 50% Club", "Percent Falls", "ALW", "TSC"),  # literal '%'
+    ("TSF", "Fixture QxStars", "Lettertown", "ALC", "TSF"),
+    ("TSE", "Fixture Q_Stars", "Underscore Bay", "ALC", "TSE"),  # literal '_'
+    ("TSG", "Fixture Gammas", "Tsarville", "NLC", "TSG"),        # city contains 'tsa' (TSA's id)
 ]
 
 # (player_id, full_name, birth_date, primary_position, bats, throws, debut_year)
@@ -210,7 +217,7 @@ def build_test_db(path):
             PITCHING,
         )
         _insert(conn, "divisions", "division_id, division_name, league", DIVISIONS)
-        _insert(conn, "teams", "team_id, team_name, division_id, fangraphs_abbrev", TEAMS)
+        _insert(conn, "teams", "team_id, team_name, city, division_id, fangraphs_abbrev", TEAMS)
         _insert(conn, "players",
                 "player_id, full_name, birth_date, primary_position, bats, throws, debut_year",
                 STAT_PLAYERS)

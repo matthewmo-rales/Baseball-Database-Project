@@ -2,7 +2,7 @@
 query parameter. Never a 500, never a traceback; only friendly 400/404/405/413
 pages (JSON endpoints share the same friendly error pages)."""
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import pytest
 
@@ -43,9 +43,24 @@ def build(rule, values):
     return path
 
 
+# Scoped exception: /teams?q= redirects a single match to its team page, so a
+# 302 passes only when Location is a same-host path that is exactly
+# /team/<ID>. Any other 302, and every other 3xx, still fails.
+TEAM_REDIRECT = re.compile(r"/team/[A-Z]{2,4}")
+TEST_HOST = "localhost"
+
+
+def is_team_redirect(resp):
+    if resp.status_code != 302:
+        return False
+    loc = urlsplit(resp.headers.get("Location", ""))
+    same_host = (not loc.scheme and not loc.netloc) or (loc.scheme in ("http", "https") and loc.netloc == TEST_HOST)
+    return same_host and not loc.query and not loc.fragment and bool(TEAM_REDIRECT.fullmatch(loc.path))
+
+
 def check(resp, url):
     body = resp.get_data(as_text=True)
-    assert resp.status_code in ALLOWED, f"{resp.status_code} for {url!r}"
+    assert resp.status_code in ALLOWED or is_team_redirect(resp), f"{resp.status_code} for {url!r}"
     assert "Traceback" not in body and "Werkzeug Debugger" not in body, url
 
 
@@ -110,3 +125,20 @@ def test_huge_path_integer_is_404(client, url):
 ])
 def test_huge_query_integer_is_400(client, url):
     assert client.get(url).status_code == 400
+
+
+@pytest.mark.parametrize("status, location, ok", [
+    (302, "/team/TSA", True),
+    (302, "http://localhost/team/TSA", True),
+    (302, "http://evil.example/team/TSA", False),
+    (302, "//evil.example/team/TSA", False),
+    (302, "/team/tsa", False),
+    (302, "/team/TSA?season=2015", False),
+    (302, "/team/TSA/x", False),
+    (302, "/teams", False),
+    (301, "/team/TSA", False),
+    (303, "/team/TSA", False),
+])
+def test_redirect_exception_is_scoped(status, location, ok):
+    from werkzeug.wrappers import Response
+    assert is_team_redirect(Response(status=status, headers={"Location": location})) is ok

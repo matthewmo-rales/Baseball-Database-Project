@@ -27,6 +27,7 @@ More screenshots: [docs/screenshots/](docs/screenshots/).
 - **Compare** two players on one WAR chart.
 - **Saved queries:** all 21 query blocks from `queries/analysis.sql`, each with its business question, technique, caveats, results, the exact SQL that ran, and a season filter where the output has a season column.
 - **Charts** built from saved-query output: wOBA leaderboard (Q01), payroll vs. win % (Q03), birth-cohort WAR (Q10), and aging curves (Q16).
+- **Teams** list grouped by league and division, searchable by team name, city or abbreviation.
 - **Team pages** with season results and single-team rosters.
 - **Player notes:** create, edit and delete notes on a player (the app's one write path).
 - Light and dark mode, following the system setting.
@@ -90,7 +91,7 @@ The app is a local demo, but it handles user input on every page and writes to t
 pytest
 ```
 
-441 tests, about a minute. They run against a small fictional database built from `design/schema.sql`, so they don't need the real one; the 2 tests that check the real database are skipped when it hasn't been built. The suite covers the saved-query parser and every query's row count, the charts and their data, player, season, compare and team pages, search, the notes CRUD flow, the loader's atomic rebuild and note carry-over, and the security controls above, including route fuzzing and the static SQL check.
+484 tests, about a minute. They run against a small fictional database built from `design/schema.sql`, so they don't need the real one; the 2 tests that check the real database are skipped when it hasn't been built. The suite covers the saved-query parser and every query's row count, the charts and their data, player, season, compare and team pages, search, the notes CRUD flow, the loader's atomic rebuild and note carry-over, and the security controls above, including route fuzzing and the static SQL check.
 
 ## Setup
 

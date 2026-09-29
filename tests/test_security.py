@@ -66,7 +66,7 @@ def test_500_is_friendly_and_logged(test_db_path, caplog):
     assert "secret internal detail" in caplog.text
 
 
-@pytest.mark.parametrize("url", ["/", "/charts", "/query", "/team/LAD", "/player/1", "/compare"])
+@pytest.mark.parametrize("url", ["/", "/charts", "/query", "/teams", "/team/LAD", "/player/1", "/compare"])
 def test_missing_database_shows_setup_page_everywhere(tmp_path, url):
     app = create_app({"TESTING": True, "DATABASE": tmp_path / "absent.db", "SECRET_KEY": "test-only-not-secret"})
     resp = app.test_client().get(url)
@@ -97,7 +97,7 @@ def test_missing_database_renders_setup_page(tmp_path):
     assert not (tmp_path / "absent.db").exists()  # mode=ro never creates it
 
 
-@pytest.mark.parametrize("path", ["/", "/?q=smith", "/no/such/page"])
+@pytest.mark.parametrize("path", ["/", "/?q=smith", "/teams", "/teams?q=Mocktown", "/no/such/page"])
 def test_security_headers_present(client, path):
     resp = client.get(path)
     assert resp.headers["Content-Security-Policy"] == CSP

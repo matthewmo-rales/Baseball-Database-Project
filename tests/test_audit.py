@@ -77,6 +77,8 @@ def boom_app(test_db_path):
 @pytest.mark.parametrize("method, url, status, kind", [
     ("get", "/", 200, "text/html"),
     ("get", f"/player/{HANK}", 200, "text/html"),
+    ("get", "/teams", 200, "text/html"),
+    ("get", "/teams?q=Mocktown", 200, "text/html"),
     ("get", "/compare?p1=abc", 400, "text/html"),
     ("get", "/no/such/page", 404, "text/html"),
     ("get", "/notes/1/delete", 405, "text/html"),
