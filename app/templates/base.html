@@ -3,22 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
   <title>{% block title %}Baseball Analytics{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   {% block head %}{% endblock %}
 </head>
+{#- Current nav section. Player, season, compare and notes pages belong to
+    Player search; the chart gallery is Charts; other query pages are Saved
+    queries. Error pages outside any route mark nothing. -#}
+{%- set endpoint = request.endpoint or "" -%}
+{%- if request.blueprint == "teams" -%}{% set section = "teams" %}
+{%- elif endpoint == "queries.gallery" -%}{% set section = "charts" %}
+{%- elif request.blueprint == "queries" -%}{% set section = "queries" %}
+{%- elif request.blueprint in ("main", "players", "compare", "notes") -%}{% set section = "players" %}
+{%- else -%}{% set section = "" %}
+{%- endif %}
+{%- macro nav_link(current, name, endpoint_name, label) -%}
+<a {% if current == name %}aria-current="page" {% endif %}href="{{ url_for(endpoint_name) }}">{{ label }}</a>
+{%- endmacro %}
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <header class="site-header">
-    <a class="brand" href="{{ url_for('main.index') }}">Baseball Analytics</a>
-    <span class="tagline">MLB seasons 2015&ndash;2025</span>
-    <nav class="site-nav" aria-label="Main">
-      <a href="{{ url_for('main.index') }}">Player search</a>
-      <a href="{{ url_for('teams.index') }}">Teams</a>
-      <a href="{{ url_for('queries.index') }}">Saved queries</a>
-      <a href="{{ url_for('queries.gallery') }}">Charts</a>
-    </nav>
+    <div class="shell">
+      <a class="brand" href="{{ url_for('main.index') }}">Baseball Analytics</a>
+      <span class="tagline">MLB seasons 2015&ndash;2025</span>
+      <nav class="site-nav" aria-label="Main">
+        {{ nav_link(section, "players", "main.index", "Player search") }}
+        {{ nav_link(section, "teams", "teams.index", "Teams") }}
+        {{ nav_link(section, "queries", "queries.index", "Saved queries") }}
+        {{ nav_link(section, "charts", "queries.gallery", "Charts") }}
+      </nav>
+    </div>
   </header>
-  <main class="content">
+  <main class="content" id="main">
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         <ul class="flashes" role="status">

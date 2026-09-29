@@ -1,122 +1,98 @@
+/* Design tokens. Dark is the default; light follows the system setting.
+   Every color in this file lives in these two blocks. charts.js reads --text
+   for the chart font color, so that name must not change. */
 :root {
-  --bg: #fbfbfa;
-  --surface: #ffffff;
-  --text: #1d232b;
-  --muted: #5b6573;
-  --border: #d9dde3;
-  --accent: #1f5f9e;
-  --accent-hover: #174a7c;
-  --row-alt: #f3f5f8;
-  --notice-bg: #fff7e0;
-  --notice-border: #e0c36a;
-  --flash-bg: #e8f3ec;
-  --flash-border: #8cc0a0;
-  --error: #b3261e;
+  color-scheme: dark;
+  --bg: #0d1117;
+  --surface: #151b23;
+  --raised: #1c2430;
+  --border: #2b3542;
+  --border-strong: #6e7b8b;
+  --text: #e6edf3;
+  --muted: #9ba8b6;
+  --accent: #6cb6ff;
+  --accent-hover: #a5d2ff;
+  --on-accent: #07121f;
+  --focus: #9fd0ff;
+  --row-alt: #121820;
+  --row-hover: #212b38;
+  --notice-bg: #261f0d;
+  --notice-border: #8f7322;
+  --flash-bg: #0f2218;
+  --flash-border: #3a7d56;
+  --error: #ff9b93;
+  --error-bg: #2a1214;
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius: 4px;
+  --radius-sm: 3px;
+  --content-width: 1200px;
 }
 
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: light) {
   :root {
-    --bg: #14181d;
-    --surface: #1b2027;
-    --text: #e6e9ed;
-    --muted: #9aa4b1;
-    --border: #2f3742;
-    --accent: #7ab4ec;
-    --accent-hover: #a3cbf2;
-    --row-alt: #20262e;
-    --notice-bg: #2b2616;
-    --notice-border: #7a6a2f;
-    --flash-bg: #16291e;
-    --flash-border: #3d6b4f;
-    --error: #f2b8b5;
+    color-scheme: light;
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --raised: #edf1f6;
+    --border: #d3dae3;
+    --border-strong: #778394;
+    --text: #111821;
+    --muted: #4f5a67;
+    --accent: #2456b0;
+    --accent-hover: #173d82;
+    --on-accent: #ffffff;
+    --focus: #2456b0;
+    --row-alt: #f6f8fb;
+    --row-hover: #e6edf6;
+    --notice-bg: #fff6d9;
+    --notice-border: #a8841a;
+    --flash-bg: #e5f4ea;
+    --flash-border: #3f8a5c;
+    --error: #b3261e;
+    --error-bg: #fdecea;
   }
 }
 
+/* ---- base ---- */
 *, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.5 var(--font-ui);
 }
 
-a { color: var(--accent); }
+a { color: var(--accent); text-underline-offset: 2px; }
 a:hover { color: var(--accent-hover); }
 
-.site-header, .content, .site-footer {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 0 16px;
-}
+h1 { font-size: 1.5rem; line-height: 1.25; margin: var(--space-2) 0 var(--space-4); }
+h2 { font-size: 1.1rem; margin: var(--space-5) 0 var(--space-3); }
+h3 { font-size: 0.95rem; margin: var(--space-4) 0 var(--space-2); }
+h2 .count { color: var(--muted); font-weight: 400; }
 
-.site-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 12px;
-  padding-top: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.brand { font-weight: 700; font-size: 1.15rem; text-decoration: none; color: var(--text); }
-.tagline { color: var(--muted); font-size: 0.9rem; }
-
-.content { padding-top: 16px; padding-bottom: 32px; }
-h1 { font-size: 1.6rem; margin: 0.5rem 0 1rem; }
-
-.search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 1rem; }
-.search label { width: 100%; font-weight: 600; }
-.search input {
-  flex: 1 1 240px;
-  min-width: 0;
-  padding: 8px 10px;
-  font: inherit;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-.search button {
-  padding: 8px 16px;
-  font: inherit;
-  color: #fff;
-  background: #1f5f9e;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.search button:hover { background: #174a7c; }
-.search select {
-  padding: 7px 10px;
-  font: inherit;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.notice {
-  padding: 10px 12px;
-  background: var(--notice-bg);
-  border: 1px solid var(--notice-border);
-  border-radius: 6px;
-}
-.result-count, .hint { color: var(--muted); font-size: 0.95rem; }
-
-.results { width: 100%; border-collapse: collapse; background: var(--surface); }
-.results th, .results td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
-.results th { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
-.results tbody tr:nth-child(even) { background: var(--row-alt); }
-.results .num { text-align: right; font-variant-numeric: tabular-nums; }
+code, pre, kbd, samp, .mono { font-family: var(--font-mono); font-size: 0.9em; }
 
 pre {
-  padding: 10px 12px;
+  padding: var(--space-3);
   overflow-x: auto;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
+
+/* Numbers line up in columns everywhere. */
+.num, td, th, dd, .result-count, .count, .stat, .ranks { font-variant-numeric: tabular-nums; }
 
 .visually-hidden {
   position: absolute;
@@ -127,144 +103,294 @@ pre {
   white-space: nowrap;
 }
 
-.flashes { list-style: none; margin: 0 0 1rem; padding: 0; }
-.flashes li {
-  padding: 8px 12px;
-  background: var(--flash-bg);
-  border: 1px solid var(--flash-border);
-  border-radius: 6px;
+/* One focus style for everything interactive. Outlines are never removed. */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible, .skip-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
-h2 { font-size: 1.2rem; margin: 1.5rem 0 0.75rem; }
-h2 .count { color: var(--muted); font-weight: 400; }
-.player-header h1 { margin-bottom: 0.25rem; }
-.player-meta { margin: 0 0 1rem; color: var(--muted); }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-
-.note-form .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-.note-form label { font-weight: 600; }
-.note-form select, .note-form textarea {
-  font: inherit;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-.note-form select { max-width: 220px; }
-.note-form textarea { width: 100%; resize: vertical; }
-.note-form button {
-  align-self: flex-start;
-  padding: 8px 16px;
-  font: inherit;
-  color: #fff;
-  background: #1f5f9e;
-  border: 0;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.note-form button:hover { background: #174a7c; }
-.field-hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
-.field-error { margin: 0; color: var(--error); font-size: 0.9rem; font-weight: 600; }
-
-.notes { list-style: none; margin: 0; padding: 0; }
-.note {
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-.note-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); font-size: 0.85rem; }
-.tag {
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text);
-}
-/* Line breaks in notes render via CSS, never by injecting <br> markup. */
-.note-body { margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.note-actions { display: flex; gap: 16px; align-items: center; font-size: 0.9rem; }
-.note-actions form { margin: 0; }
-.link-button {
-  padding: 0;
-  font: inherit;
+/* ---- shell ---- */
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 100;
+  padding: var(--space-2) var(--space-3);
+  background: var(--raised);
   color: var(--accent);
-  background: none;
-  border: 0;
-  text-decoration: underline;
-  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  transform: translateY(-200%);
 }
-.link-button.danger { color: var(--error); }
+.skip-link:focus { transform: none; }
+
+.shell, .content, .site-footer {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.site-header .shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+.brand { font-weight: 700; font-size: 1rem; text-decoration: none; color: var(--text); }
+.brand:hover { color: var(--text); }
+.tagline { color: var(--muted); font-size: 0.85rem; }
+
+.site-nav { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-left: auto; font-size: 0.9rem; }
+.site-nav a {
+  padding: var(--space-1) var(--space-2);
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+.site-nav a:hover { color: var(--text); background: var(--row-hover); }
+.site-nav a[aria-current="page"] {
+  color: var(--text);
+  background: var(--raised);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+@media (min-width: 720px) {
+  .site-header { position: sticky; top: 0; z-index: 10; }
+}
+@media (max-width: 719px) {
+  .site-nav { margin-left: 0; width: 100%; }
+}
+
+.content { padding-top: var(--space-4); padding-bottom: var(--space-6); }
 
 .site-footer {
-  padding-top: 12px;
-  padding-bottom: 24px;
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-5);
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 0.85rem;
 }
 
-/* ---- player, season and compare pages ---- */
-h3 { font-size: 1rem; margin: 1.25rem 0 0.5rem; }
-.table-scroll { overflow-x: auto; }
-.stats { font-size: 0.9rem; }
-.stats th, .stats td { white-space: nowrap; }
-.stats .num { text-align: right; font-variant-numeric: tabular-nums; }
-.stats tfoot th, .stats tfoot td { font-weight: 600; border-top: 2px solid var(--border); }
-.stats tfoot th { text-align: left; }
-.compare tbody th { text-align: left; font-weight: 400; }
-.compare thead th { vertical-align: bottom; font-size: 0.9rem; color: var(--text); white-space: normal; }
-.compare .group th { font-weight: 600; color: var(--muted); padding-top: 14px; }
-.fn-mark { color: var(--muted); padding-left: 1px; }
-.footnotes { list-style: none; margin: 6px 0 0; padding: 0; color: var(--muted); font-size: 0.85rem; }
-.caption { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
-.breadcrumb { margin: 0 0 0.5rem; font-size: 0.9rem; }
-.season-title { font-size: 1.35rem; margin-top: 0.5rem; }
-.banner { margin: 0.5rem 0; }
+/* ---- forms ---- */
+input[type="search"], input[type="text"], input[type="number"], select, textarea {
+  padding: 6px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
+
+/* Primary button: every plain <button>. .button-secondary and .link-button
+   are the other variants. */
+button {
+  padding: 6px 14px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.button-secondary {
+  color: var(--text);
+  background: var(--raised);
+  border-color: var(--border-strong);
+}
+.button-secondary:hover { color: var(--text); background: var(--row-hover); border-color: var(--border-strong); }
+
+.link-button {
+  padding: 0;
+  font-weight: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-button:hover { color: var(--accent-hover); background: none; }
+.link-button.danger, .link-button.danger:hover { color: var(--error); }
+
+.search { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); }
+.search label { width: 100%; font-weight: 600; font-size: 0.9rem; }
+.search input { flex: 1 1 240px; min-width: 0; }
 .search input[type="hidden"] + label { width: 100%; }
 
-.chart { min-height: 440px; }
-.chart-loading, .chart-failed { color: var(--muted); padding: 16px 0; }
+.note-form .field { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-3); }
+.note-form label { font-weight: 600; font-size: 0.9rem; }
+.note-form select { max-width: 220px; }
+.note-form textarea { width: 100%; resize: vertical; }
+.note-form button { align-self: flex-start; }
+.field-hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.field-error { margin: 0; color: var(--error); font-size: 0.9rem; font-weight: 600; }
+
+/* ---- messages ---- */
+.notice {
+  padding: var(--space-2) var(--space-3);
+  background: var(--notice-bg);
+  border: 1px solid var(--notice-border);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+}
+.notice > :first-child { margin-top: 0; }
+.notice > :last-child { margin-bottom: 0; }
+.panel { margin: var(--space-3) 0; }
+.panel h2 { margin-top: 0; }
+.banner { margin: var(--space-2) 0; }
+
+.flashes { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.flashes li {
+  padding: var(--space-2) var(--space-3);
+  background: var(--flash-bg);
+  border: 1px solid var(--flash-border);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+}
+
+.result-count, .hint { color: var(--muted); font-size: 0.9rem; }
+
+/* ---- tables ---- */
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-2);
+}
+.table-scroll > table { border: 0; }
+
+.results {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+.results th, .results td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+/* No text-transform: stat names are case-sensitive (wOBA, wRC+, xFIP). */
+.results thead th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  background: var(--raised);
+  white-space: nowrap;
+}
+.results tbody tr:nth-child(even) { background: var(--row-alt); }
+.results tbody tr:hover { background: var(--row-hover); }
+.results tbody tr:last-child > * { border-bottom: 0; }
+.results .num, .stats .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.stats th, .stats td { white-space: nowrap; }
+.stats tfoot th, .stats tfoot td { font-weight: 600; border-top: 2px solid var(--border-strong); }
+.stats tfoot th { text-align: left; }
+.compare tbody th { text-align: left; font-weight: 400; }
+.compare thead th { vertical-align: bottom; white-space: normal; }
+.compare .group th {
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  background: var(--raised);
+}
+.query-results td { white-space: nowrap; }
+
+.fn-mark { color: var(--muted); padding-left: 1px; }
+.footnotes { list-style: none; margin: var(--space-2) 0 0; padding: 0; color: var(--muted); font-size: 0.85rem; }
+.caption { color: var(--muted); font-size: 0.85rem; margin-top: var(--space-2); }
+
+/* ---- page furniture ---- */
+.breadcrumb { margin: 0 0 var(--space-2); font-size: 0.85rem; color: var(--muted); }
+.player-header h1 { margin-bottom: var(--space-1); }
+.player-meta { margin: 0 0 var(--space-4); color: var(--muted); }
+.season-title { font-size: 1.3rem; margin-top: var(--space-2); }
 
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: 6px;
-  margin: 0 0 10px;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-3);
 }
 .stat {
-  padding: 6px 8px;
+  padding: 6px var(--space-2);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
-.stat dt { font-size: 0.75rem; color: var(--muted); }
+.stat dt { font-size: 0.75rem; letter-spacing: 0.02em; color: var(--muted); }
 .stat dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-.ranks { list-style: none; margin: 0 0 8px; padding: 0; }
+.ranks { list-style: none; margin: 0 0 var(--space-2); padding: 0; }
 .ranks li { padding: 2px 0; }
 .rank-label { display: inline-block; min-width: 56px; font-weight: 600; }
 
+/* ---- notes ---- */
+.notes { list-style: none; margin: 0; padding: 0; }
+.note {
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.note-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; color: var(--muted); font-size: 0.85rem; }
+.tag {
+  padding: 0 6px;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+/* Line breaks in notes render via CSS, never by injecting <br> markup. */
+.note-body { margin: var(--space-2) 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-actions { display: flex; gap: var(--space-4); align-items: center; font-size: 0.9rem; }
+.note-actions form { margin: 0; }
 .notes-panel .note-body { margin-bottom: 0; }
 
-/* ---- navigation and saved queries ---- */
-.site-nav { display: flex; gap: 16px; margin-left: auto; font-size: 0.95rem; }
+/* ---- charts ---- */
+.chart {
+  min-height: 440px;
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.chart-loading, .chart-failed { color: var(--muted); padding: var(--space-4) 0; margin: 0; }
+
+/* ---- saved queries ---- */
 .query-list { list-style: none; margin: 0; padding: 0; }
-.query-list li { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.query-list li { padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
 .query-question { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; }
-.query-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 1rem; }
+.query-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px var(--space-4); margin: 0 0 var(--space-4); }
 .query-meta dt { font-weight: 600; }
 .query-meta dd { margin: 0; }
-.panel h2 { margin-top: 0; }
-.season-choices { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; margin: 0; padding: 0; }
-.query-results td { white-space: nowrap; }
-.sql { font-size: 0.85rem; line-height: 1.4; }
-.bound ul { margin: 0 0 8px; padding-left: 20px; }
+.season-choices { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); list-style: none; margin: 0; padding: 0; }
+.sql { font-size: 0.85rem; line-height: 1.45; }
+.bound ul { margin: 0 0 var(--space-2); padding-left: 20px; }
 
+/* ---- small screens ---- */
 @media (max-width: 560px) {
   .results th, .results td { padding: 6px; }
   .query-meta { grid-template-columns: 1fr; }
   .query-meta dd { margin-bottom: 6px; }
-  .chart { min-height: 360px; }
+  .chart { min-height: 360px; padding: 0; border-width: 1px 0; border-radius: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
