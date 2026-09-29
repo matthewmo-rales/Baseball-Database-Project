@@ -22,7 +22,7 @@ python3 --version
 
 ## 2. Clone and install
 
- The install step downloads about 30 packages; clone plus install took about a minute and a half in the check.
+ The install step downloads about 30 packages; clone plus install took about three minutes in the check.
 
 ```powershell
 # Windows PowerShell
@@ -61,7 +61,7 @@ python scripts/load_data.py --refresh
 - FanGraphs season statistics, 2015–2025: player batting, player pitching, team batting and team pitching, one request per season each (44 requests, one second apart), from FanGraphs' API. Running the loader with `--refresh` is your use of FanGraphs' API, and you are responsible for complying with FanGraphs' terms of service.
 - The Chadwick Baseball Bureau player register (a ~30 MB zip from GitHub), for names, birth dates and IDs.
 
-In the fresh-clone check for this guide, the build took about 2 minutes 15 seconds, almost all of it downloading, and `database/raw/` came to 45 files (about 6 MB). Your time depends on your connection.
+In the fresh-clone check for this guide, the build took about 2 minutes 40 seconds, almost all of it downloading, and `database/raw/` came to 45 files (about 6 MB). Your time depends on your connection.
 
 The loader prints each step and ends with `OK: ...database/baseball.db`. Without a payroll file it also prints a payroll warning, which is expected (see step 4). It validates the build (rate stats recomputed and compared against FanGraphs, league-wide wins = losses and runs scored = runs allowed, foreign-key check) and exits with an error on any mismatch.
 
@@ -119,7 +119,7 @@ pytest
 pytest
 ```
 
-The suite (441 tests) takes about a minute. The tests use a small fictional database built from `design/schema.sql`, so they don't need `database/baseball.db`. The 2 tests that check the real database are skipped when it hasn't been built (`439 passed, 2 skipped`).
+The suite (489 tests) takes about three minutes. The tests use a small fictional database built from `design/schema.sql`, so they don't need `database/baseball.db`. The 2 tests that check the real database are skipped when it hasn't been built (`487 passed, 2 skipped`).
 
 ## 7. Troubleshooting
 

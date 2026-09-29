@@ -6,12 +6,16 @@ A SQLite database of MLB season statistics for 2015–2025, an analytics layer o
 
 <table>
   <tr>
-    <td width="50%"><a href="docs/screenshots/02-player-war-chart.png"><img src="docs/screenshots/02-player-war-chart.png" alt="Player page: WAR per 162 games by season against the mean of other qualified players at the same position"></a><br><sub>Player WAR per 162 games vs. other qualified players at the position</sub></td>
-    <td width="50%"><a href="docs/screenshots/05-saved-query-sql.png"><img src="docs/screenshots/05-saved-query-sql.png" alt="Saved query Q12b: header fields, results table and the SQL that ran"></a><br><sub>A saved query with its caveats, results and the exact SQL that ran</sub></td>
+    <td width="50%"><a href="docs/screenshots/01-search-shared-name.png"><img src="docs/screenshots/01-search-shared-name.png" alt="Landing page in dark mode: a search for will smith returns two players with different IDs, above cards linking to player search, teams, saved queries and charts"></a><br><sub>Landing page: player search, where the ID column separates two players with the same name</sub></td>
+    <td width="50%"><a href="docs/screenshots/09-teams.png"><img src="docs/screenshots/09-teams.png" alt="Teams page in dark mode: a search box for team name, city or abbreviation, and all 30 teams grouped by league and division, each with its abbreviation"></a><br><sub>Teams, grouped by league and division</sub></td>
   </tr>
   <tr>
-    <td width="50%"><a href="docs/screenshots/07-team-roster.png"><img src="docs/screenshots/07-team-roster.png" alt="Team page: team header and the first rows of the 2025 hitter roster"></a><br><sub>Team page with a season roster (seasons table cropped out)</sub></td>
-    <td width="50%"><a href="docs/screenshots/08-dark-mode-chart.png"><img src="docs/screenshots/08-dark-mode-chart.png" alt="Dark mode: hitter aging curves by position group, delta method"></a><br><sub>Aging curves by position group (Q16), dark mode</sub></td>
+    <td width="50%"><a href="docs/screenshots/02-player-war-chart.png"><img src="docs/screenshots/02-player-war-chart.png" alt="Player page in dark mode: Mookie Betts's WAR per 162 games by season against the mean of other qualified outfielders"></a><br><sub>Player WAR per 162 games vs. other qualified players at the position</sub></td>
+    <td width="50%"><a href="docs/screenshots/05-saved-query-sql.png"><img src="docs/screenshots/05-saved-query-sql.png" alt="Saved query Q12b in dark mode: header fields, the three-row results table and the start of the SQL that ran"></a><br><sub>A saved query with its caveats, results and the exact SQL that ran</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="docs/screenshots/07-team-roster.png"><img src="docs/screenshots/07-team-roster.png" alt="Team page roster section in dark mode: season selector, multi-team note, WAR totals and the 2025 Seattle Mariners hitters table"></a><br><sub>Team page season roster (team header and seasons table cropped out)</sub></td>
+    <td width="50%"><a href="docs/screenshots/08-dark-mode-chart.png"><img src="docs/screenshots/08-dark-mode-chart.png" alt="Dark mode: hitter aging curves by position group, delta method, with raw markers and smoothed lines"></a><br><sub>Aging curves by position group (Q16), dark mode</sub></td>
   </tr>
 </table>
 
@@ -30,7 +34,9 @@ More screenshots: [docs/screenshots/](docs/screenshots/).
 - **Teams** list grouped by league and division, searchable by team name, city or abbreviation.
 - **Team pages** with season results and single-team rosters.
 - **Player notes:** create, edit and delete notes on a player (the app's one write path).
-- Light and dark mode, following the system setting.
+- **Dark-first interface** that follows the operating system's light or dark setting.
+- **Keyboard access:** a skip link to the main content is the first Tab stop, and every interactive element shows a visible focus ring.
+- **Contrast checked to WCAG AA in both themes:** at least 4.5:1 for text and 3:1 for input borders and the focus ring.
 
 ## Architecture
 
@@ -91,11 +97,11 @@ The app is a local demo, but it handles user input on every page and writes to t
 pytest
 ```
 
-489 tests, about a minute. They run against a small fictional database built from `design/schema.sql`, so they don't need the real one; the 2 tests that check the real database are skipped when it hasn't been built. The suite covers the saved-query parser and every query's row count, the charts and their data, player, season, compare and team pages, search, the notes CRUD flow, the loader's atomic rebuild and note carry-over, and the security controls above, including route fuzzing and the static SQL check.
+489 tests, about three minutes. They run against a small fictional database built from `design/schema.sql`, so they don't need the real one; the 2 tests that check the real database are skipped when it hasn't been built. The suite covers the saved-query parser and every query's row count, the charts and their data, player, season, compare and team pages, search, the notes CRUD flow, the loader's atomic rebuild and note carry-over, and the security controls above, including route fuzzing and the static SQL check.
 
 ## Setup
 
-About 5 minutes on a fresh clone, most of it downloading packages and data.
+About 6 minutes on a fresh clone, most of it downloading packages and data.
 
 ```sh
 py -3.14 -m venv venv; venv\Scripts\Activate.ps1   # macOS/Linux: python3 -m venv venv; source venv/bin/activate
@@ -122,4 +128,4 @@ Limitations:
 
 ## Author
 
-\George Morales · \ www.linkedin.com/in/matthew-morales-0bb858382 · \ matthewmorales300@gmail.com
+Matthew Morales · www.linkedin.com/in/matthew-morales-0bb858382 · matthewmorales300@gmail.com
